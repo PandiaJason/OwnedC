@@ -23,6 +23,7 @@ add_library(ownedc SHARED
     src/region.c
     src/ownedc_string.c
     src/ownedc_array.c
+    src/ownedc_rc.c
 )
 target_link_libraries(ownedc Threads::Threads)
 
@@ -56,6 +57,9 @@ target_link_libraries(demo_string ownedc)
 
 add_executable(demo_array examples/demo_array.c)
 target_link_libraries(demo_array ownedc)
+
+add_executable(demo_rc examples/demo_rc.c)
+target_link_libraries(demo_rc ownedc)
 
 # Testing
 enable_testing()
