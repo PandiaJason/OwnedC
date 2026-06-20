@@ -18,10 +18,20 @@ typedef enum {
     OWNEDC_STATE_FREED
 } ownership_state_t;
 
+#if defined(__GNUC__) || defined(__clang__)
+  #define OWNEDC_MALLOC_ATTR __attribute__((warn_unused_result, alloc_size(1)))
+  #define OWNEDC_CALLOC_ATTR __attribute__((warn_unused_result, alloc_size(1, 2)))
+  #define OWNEDC_REALLOC_ATTR __attribute__((warn_unused_result, alloc_size(2)))
+#else
+  #define OWNEDC_MALLOC_ATTR
+  #define OWNEDC_CALLOC_ATTR
+  #define OWNEDC_REALLOC_ATTR
+#endif
+
 /* Public allocation API */
-void* owner_malloc(size_t size);
-void* owner_calloc(size_t num, size_t size);
-void* owner_realloc(void* ptr, size_t size);
+void* owner_malloc(size_t size) OWNEDC_MALLOC_ATTR;
+void* owner_calloc(size_t num, size_t size) OWNEDC_CALLOC_ATTR;
+void* owner_realloc(void* ptr, size_t size) OWNEDC_REALLOC_ATTR;
 void  owner_free(void* ptr);
 
 /* RAII Cleanup helper for GCC/Clang */

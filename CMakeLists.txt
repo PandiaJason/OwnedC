@@ -28,8 +28,31 @@ target_link_libraries(ownedc Threads::Threads)
 add_executable(demo examples/demo.c)
 target_link_libraries(demo ownedc Threads::Threads)
 
+add_executable(demo_hybrid_cheri examples/demo_hybrid_cheri.c)
+target_link_libraries(demo_hybrid_cheri ownedc Threads::Threads)
+
+add_executable(demo_full_showcase examples/demo_full_showcase.c)
+target_link_libraries(demo_full_showcase ownedc Threads::Threads)
+
+add_executable(demo_raii examples/demo_raii.c)
+target_link_libraries(demo_raii ownedc Threads::Threads)
+
+add_executable(demo_vector examples/demo_vector.c)
+target_link_libraries(demo_vector ownedc Threads::Threads)
+
+add_executable(demo_region examples/demo_region.c)
+target_link_libraries(demo_region ownedc Threads::Threads)
+
+add_executable(demo_threads examples/demo_threads.c)
+target_link_libraries(demo_threads ownedc Threads::Threads)
+
 # Testing
 enable_testing()
+
+# Normal tests
+add_executable(test_hybrid_compile tests/test_hybrid_compile.c)
+target_link_libraries(test_hybrid_compile ownedc Threads::Threads)
+add_test(NAME HybridCompileTest COMMAND test_hybrid_compile)
 
 # Normal tests
 add_executable(test_malloc tests/test_malloc.c)
