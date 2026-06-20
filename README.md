@@ -83,10 +83,13 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 - **Automated Memory Management (RAII):** Utilizes `__attribute__((cleanup))` to provide deterministic resource management.
 - **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
+- **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks.
 - **Concurrency Safety:** Provides `owned_mutex_t` and `OWNED_LOCK` to automatically unlock mutexes upon returning, eliminating deadlocks.
-- **Resource Safety (Safe File I/O):** Provides `safe_file_t` and `OWNED_FILE` to automatically close file descriptors, eliminating FD leaks.
+- **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads.
 - **Pluggable Allocators:** Integrates with `jemalloc`, `mimalloc`, or game-engine allocators via `ownedc_set_allocators()`.
-- **Shared Ownership:** Implements `owned_rc_t` for robust reference counting, securely destroying data exactly when the final reference drops.
+- **Shared Ownership:** Implements `owned_rc_t` for robust reference counting.
+- **Garbage Collection (Cycle Detection):** Advanced reference counting includes `owned_rc_collect_cycles()` to forcefully detect and reclaim isolated cyclic graphs.
+- **Rust-Like Error Handling:** Features `owned_result_t` (Result types) and the `TRY_UNWRAP` macro to force explicit error handling, bypassing null pointer dereferences.
 - **Safe Strings & Collections:** Includes bounds-checked, auto-resizing strings (`safe_string`) and generic vectors (`safe_vector`) protected by the ownership runtime.
 - **Deep-Freeing Arrays:** Provides `owned_array_t`, a bounds-checked array that automatically iterates and recursively frees its contained pointers upon destruction.
 - **High-Performance Arenas:** Features `safe_region` for massive bump-pointer throughput.
@@ -119,9 +122,13 @@ The repository comes with a comprehensive suite of examples. Run them to see the
 - `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings for request parsing.
 - `build/demo_allocator`: Enterprise Custom Allocator Integration.
 - `build/demo_file`: Safe File I/O and Descriptor Tracking.
+- `build/demo_socket`: Safe Network Sockets.
 - `build/demo_mutex`: Concurrency Safety and Deadlock Prevention.
+- `build/demo_thread_safe`: Safe Managed Threads (Auto-join/detach).
+- `build/demo_result`: Rust-Like Error Handling (`Result<T, E>`).
 - `build/demo_raii`: Auto-cleanup in action.
 - `build/demo_rc`: Shared Ownership and Reference Counting.
+- `build/demo_rc_cycle`: Garbage Collection (RC Cycle Detection).
 - `build/demo_string`: Safe Strings with bounds-checking and auto-resizing.
 - `build/demo_array`: Deep-Freeing Arrays of Pointers.
 - `build/demo_vector`: Safe Collections and bounds-checking.
