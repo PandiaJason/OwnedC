@@ -2,36 +2,67 @@
   <img src="assets/logo.jpg" alt="OwnedC Logo" width="200"/>
 </p>
 
-# OwnedC: Rust-Inspired Memory Safety for C
-[![C/C++ CI](https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml/badge.svg)](https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml)
+<h1 align="center">OwnedC</h1>
+<p align="center"><i>Ownership-aware memory safety for C — without rewriting your codebase.</i></p>
 
-> [!WARNING]
-> **Project Maturity:** OwnedC is an early-stage research prototype. It has not been subjected to external security audits. It is intended for experimentation and is not yet recommended for mission-critical production environments.
-
-OwnedC is a lightweight memory safety framework and static analysis toolkit that brings modern ownership semantics, thread safety, and RAII (Resource Acquisition Is Initialization) to existing C codebases. It is designed to mitigate use-after-free and data-race vulnerabilities without requiring a transition to a completely different programming language.
+<p align="center">
+  <a href="https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml"><img src="https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License"/>
+  <img src="https://img.shields.io/badge/standard-C99%20%2F%20C11-informational.svg" alt="C Standard"/>
+  <img src="https://img.shields.io/badge/status-research%20prototype-orange.svg" alt="Status"/>
+</p>
 
 ---
 
-## The API at a Glance
+## Overview
 
-Unlike traditional C where memory management relies on developer discipline, OwnedC enforces deterministic, scope-bound resource cleanup.
+OwnedC is a memory safety framework for C that brings ownership tracking, scope-bound RAII, and dynamic borrow checking to existing codebases, without requiring a migration to a different language. It is implemented as a dual-layer system: a runtime metadata registry performs dynamic ownership and borrow checks, and a static analyzer (`ownedc_lint.py`) performs best-effort compile-time linting against the same ownership rules.
 
-**Before (Raw C):**
-```c
-void process_data() {
-    void* buffer = malloc(1024);
-    if (!buffer) return;
-    
-    if (compute_something(buffer) < 0) {
-        free(buffer); // Easy to forget on error paths
-        return;
-    }
-    
-    free(buffer);
-}
-```
+OwnedC is a research prototype. It has not undergone external security review, and the performance characteristics of its core tracking path are documented, not hidden — see [Performance](#performance) before deciding where in your codebase to use it.
 
-**After (OwnedC):**
+## Project Status
+
+OwnedC is pre-1.0. APIs may change without notice between commits. The table below reflects maturity per subsystem as of this writing; it should be kept current as test coverage changes, and verified against actual CI results rather than taken at face value.
+
+| Subsystem | Status | Notes |
+|---|---|---|
+| RAII (`OWNED`, `owner_malloc`) | Beta | Functionally correct; high per-call overhead (see Performance) |
+| Dynamic Borrow Checking | Beta | Aborts on violation; covered by `tests/` |
+| Static Lint (`ownedc_lint.py`) | Beta | Heuristic, not a sound type system — see Non-Goals |
+| Thread Ownership Verification | Beta | Single global registry; not yet stress-tested at high thread counts |
+| Arenas (`safe_region`) | Beta | Benchmarked; single-threaded by design |
+| Safe Collections (vector / string / array) | Beta | |
+| CHERI Integration (`ownedc_cheri.h`) | Experimental | Limited hardware test surface (Morello) |
+| C++ Wrappers (`ownedc.hpp`) | Experimental | |
+| Concurrency: Mutex (`owned_mutex_t`) | Beta | |
+| Concurrency: Managed Threads (`OWNED_THREAD`) | Experimental | |
+| Concurrency: Futures / Channels | Experimental | |
+| Resource Safety: File / Socket wrappers | Experimental | |
+| Pluggable Allocators (jemalloc / mimalloc) | Experimental | |
+| Shared Ownership / Rc + cycle collection | Experimental | |
+| Memory Profiler GUI | Experimental | |
+| Kernel / Embedded mode (`NO_STDLIB`) | Experimental | Disables concurrency, sockets, file I/O |
+
+> **Beta**: implemented, tested, behavior is documented and benchmarked where relevant.
+> **Experimental**: implemented, not yet stress-tested; API may change; not recommended outside of evaluation.
+
+## Design Goals
+
+- Add memory and ownership safety to existing C codebases without a full rewrite.
+- Make the cost of safety explicit and measurable, not assumed.
+- Provide a zero-overhead path (`safe_region`) for hot loops that cannot absorb tracking cost.
+- Allow hardware-enforced safety (CHERI) to be adopted incrementally where available, without requiring it.
+- Interoperate with existing allocators and C++ call sites rather than requiring isolation.
+
+## Non-Goals
+
+- **Not a sound static analyzer.** `ownedc_lint.py` is heuristic. It catches common misuse patterns; it does not provide the compile-time guarantees of a type system like Rust's borrow checker.
+- **Not a general-purpose garbage collector.** `owned_rc_t` targets cycle reclamation within bounded, explicitly-owned reference graphs — not whole-heap GC.
+- **Not a high-throughput general allocator.** `owner_malloc` trades throughput for traceability; `safe_region` is the allocator for performance-sensitive paths.
+- **Not production-hardened.** No external audit has been performed. Treat all safety guarantees as best-effort until a 1.0 release.
+
+## Quick Start
+
 ```c
 #include "ownedc.h"
 
@@ -39,77 +70,103 @@ void process_data() {
     // Memory is automatically tracked and safely freed when 'buffer' leaves scope
     OWNED void* buffer = owner_malloc(1024);
     if (!buffer) return;
-    
+
     if (compute_something(buffer) < 0) {
-        return; // No memory leak! 'buffer' is automatically cleaned up.
+        return; // No leak: 'buffer' is automatically cleaned up.
     }
 }
 ```
 
----
+Compare to the equivalent raw C, where the `free()` on the error path is easy to omit:
 
-## Performance & Benchmarks
+```c
+void process_data() {
+    void* buffer = malloc(1024);
+    if (!buffer) return;
 
-For a memory-safety tool, the primary concern is the overhead introduced by safety checks. OwnedC's dynamic registry requires taking a mutex and tracking metadata for standard allocations.
+    if (compute_something(buffer) < 0) {
+        free(buffer); // easy to forget
+        return;
+    }
+    free(buffer);
+}
+```
 
-### Methodology
-- **Hardware:** Apple Silicon (macOS)
-- **Compiler:** Clang 15 (`-O3` equivalent release build via CMake)
-- **Workload:** 500,000 allocations of 32 bytes each, executed via `tests/benchmark.c`.
+## Performance
 
-| Allocation Strategy | Single-Thread Time | Overhead vs Raw | Multi-Thread Time (8 Threads) | Multi-Thread Overhead |
-|---------------------|--------------------|-----------------|-------------------------------|-----------------------|
-| Raw `malloc` / `free` | 0.0616s | **Baseline (1.0x)** | 0.0296s | **Baseline (1.0x)** |
-| `owner_malloc` / `free` | 9.2519s | **150.1x** | 5.5906s | **188.7x** |
-| `safe_region` (Arena) | 0.0097s | **0.15x (6.3x Faster)** | N/A (Single-thread by design) | N/A |
+OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_malloc`/`owner_free` call. That cost is real and is reported here directly rather than abstracted away.
 
-*Takeaway:* Individual `owner_malloc` calls introduce significant overhead (~150x-188x), heavily exacerbated by global hash map collisions and mutex lock contention under highly concurrent loads. Because of this, `owner_malloc` is intended for cold paths and setup code. For high-performance hot paths, `safe_region` (Arenas) is the production-viable allocator. The arena completely bypasses the granular global hash-map, achieving speeds **~6.3x faster** than single-threaded raw `malloc` while fully retaining leak-protection and memory safety. Arenas are inherently single-thread-by-design to achieve these lock-free speeds; for concurrent workloads, developers spawn thread-local arenas.
+**Methodology:** Apple Silicon (macOS), Clang 15, `-O3`-equivalent release build via CMake, 500,000 allocations of 32 bytes each, via `tests/benchmark.c`.
 
----
+| Allocation Strategy | Single-Thread | Overhead | 8-Thread | Overhead |
+|---|---|---|---|---|
+| Raw `malloc`/`free` | 0.0616s | 1.0x (baseline) | 0.0296s | 1.0x (baseline) |
+| `owner_malloc`/`free` | 9.2519s | 150.1x | 5.5906s | 188.7x |
+| `safe_region` (arena) | 0.0097s | 0.15x (6.3x faster) | N/A — single-threaded by design | — |
 
-## Prior Art & Comparisons
+**Guidance:** `owner_malloc` is for cold paths, setup code, and diagnostics — not hot loops. `safe_region` is the production-viable allocator for performance-sensitive code; for concurrent workloads, use one arena per thread. The overhead gap is attributed to global hash-map collisions and mutex contention in the registry and is tracked as a roadmap item (see below) rather than treated as a fixed cost of the design.
 
-The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs compared to prior art:
+## Architecture
 
-- **Checked C (Microsoft Research):** Checked C introduces sweeping syntactic changes (`_Ptr`, `_Array_ptr`) requiring extensive codebase rewrites. OwnedC attempts to remain closer to standard C syntax via attributes and macros.
-- **ASan (AddressSanitizer):** ASan is heavily instrumented and generally restricted to debug builds (running ~2-3x overhead). OwnedC serves a different architectural purpose: `owner_malloc` acts as a strict diagnostic and setup layer, while `safe_region` serves as the production-capable runtime layer for your high-performance paths.
-- **CHERI / Morello:** CHERI provides hardware-enforced spatial memory safety. Rather than competing with CHERI, OwnedC **integrates** with it. When compiled on a CHERI toolchain, OwnedC automatically upgrades its pointers to `__capability` bounded hardware pointers via `ownedc_cheri.h`.
-- **Rust:** Rust provides zero-cost abstractions and static safety. OwnedC is intended for legacy C codebases that simply cannot afford a full language rewrite, leaning on dynamic runtime checks and lock-free arenas as a compromise.
+```
+                 ┌─────────────────────────┐
+                 │   ownedc_lint.py (CI)    │   compile-time, heuristic
+                 └────────────┬─────────────┘
+                              │
+   source ──────────────────►│  build
+                              │
+                 ┌────────────▼─────────────┐
+                 │   ownedc.h runtime core   │
+                 │  (registry + borrow check)│
+                 └──────┬─────────────┬──────┘
+                         │             │
+              ┌──────────▼───┐   ┌─────▼──────────┐
+              │ owner_malloc │   │  safe_region    │
+              │ (tracked,    │   │  (arena, single-│
+              │  mutex-bound)│   │   thread, O(1)  │
+              └──────────────┘   │   bulk free)    │
+                                  └─────────────────┘
+                         │
+               optional hardware backend
+                         │
+                 ┌───────▼────────┐
+                 │  CHERI/Morello  │
+                 └─────────────────┘
+```
 
----
+## Feature Matrix
 
-## Core Features
+| Feature | Header / Tool | Requires |
+|---|---|---|
+| RAII auto-cleanup | `ownedc.h` (`OWNED`) | GCC or Clang (`__attribute__((cleanup))`) |
+| Dynamic borrow checking | `ownedc.h` | — |
+| Static lint | `ownedc_lint.py` | Python 3.x |
+| Thread ownership verification | `ownedc.h` | OS threading |
+| Arenas | `ownedc.h` (`safe_region`) | — |
+| Safe collections (vector/string/array) | `ownedc.h` | — |
+| CHERI capability upgrade | `ownedc_cheri.h` | CHERI toolchain / hardware |
+| C++ RAII wrappers | `ownedc.hpp` | C++ compiler |
+| Mutex / deadlock safety | `ownedc.h` (`owned_mutex_t`) | OS threading |
+| Managed threads | `ownedc.h` (`OWNED_THREAD`) | OS threading |
+| Futures / MPSC channels | `ownedc_future.c`, `ownedc_channel.c` | OS threading |
+| Safe file / socket I/O | `ownedc.h` (`safe_file_t`, `safe_socket_t`) | OS support |
+| Pluggable allocators | `ownedc_set_allocators()` | jemalloc / mimalloc (optional) |
+| Reference counting + cycle GC | `ownedc.h` (`owned_rc_t`) | — |
+| Profiler dashboard | `tools/ownedc_profiler.py` | Python 3.x |
+| Bare-metal / kernel mode | `OWNEDC_NO_STDLIB` | Disables threading, sockets, file I/O |
 
-- **Automated Memory Management (RAII):** Utilizes `__attribute__((cleanup))` to provide deterministic resource management.
-- **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime.
-- **Static Ownership Analysis:** Includes `ownedc_lint.py`, acting as a heuristical "Borrow Checker" running offline at compile-time to intercept memory leaks, double-frees, and use-after-free before you run your executable.
-- **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
-- **First-Class C++ RAII Wrappers:** Use `ownedc.hpp` for `owned_ptr<T>` and `borrowed_ptr<T>` native C++ classes that automatically bridge C++ constructors/destructors to our robust C memory safety backend.
-- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) channel-based message passing without race conditions. *(Requires OS Threading)*
-- **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks. *(Requires OS Support)*
-- **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads. *(Requires OS Threading)*
-- **Type-Safe Generics:** Macro-driven `OWNEDC_DEFINE_VECTOR(T)` natively generates type-safe arrays with completely transparent void* castings.
-- **Kernel & Embedded Mode:** `OWNEDC_NO_STDLIB` totally abstracts standard libraries out of the library for bare-metal OS or embedded microcontroller execution. *(Note: Concurrency, Sockets, and File I/O features are inherently disabled in this mode).*
-- **Pluggable Allocators:** Integrates with `jemalloc`, `mimalloc`, or game-engine allocators via `ownedc_set_allocators()`.
-- **High-Performance Arenas:** Features `safe_region` for single-threaded, zero-overhead bump-pointer throughput where bulk allocations can be dropped instantly in O(1) time.
-- **Shared Ownership & GC:** Implements `owned_rc_t` for reference counting, and advanced cycle detection via `owned_rc_collect_cycles()` to reclaim cyclic memory graphs.
-- **Memory Profiler GUI:** Automatically exports the full ownership graph memory states using `ownership_dump_json()` and generates an HTML dashboard using `tools/ownedc_profiler.py`.
-- **Rust-Like Error Handling:** Features `owned_result_t` (Result types) and the `TRY_UNWRAP` macro to force explicit error handling.
-- **Deep-Freeing Arrays:** Provides `owned_array_t` for bounds-checked arrays that recursively free elements upon destruction.
-- **CHERI Integration:** `ownedc_cheri.h` transparently upgrades allocations to capability pointers on Morello hardware.
+## Comparison to Prior Art
 
-> **Note on Standard Compatibility:** The core dynamic registry is fully C99/C11 compliant. However, the RAII macro (`OWNED`) explicitly relies on the `__attribute__((cleanup))` extension. Therefore, while the library compiles universally, the automatic-cleanup feature specifically requires **GCC or Clang**.
+| Project | Approach | Trade-off vs. OwnedC |
+|---|---|---|
+| Checked C (Microsoft Research) | New pointer syntax (`_Ptr`, `_Array_ptr`) | Requires source rewrite; OwnedC stays closer to standard C syntax |
+| AddressSanitizer | Compile-time instrumentation, debug-build use | ~2-3x overhead, diagnostic-only; OwnedC's `safe_region` targets production hot paths |
+| CHERI / Morello | Hardware-enforced capability pointers | OwnedC integrates with CHERI rather than competing with it |
+| Rust | Compile-time ownership, zero-cost | Requires a rewrite; OwnedC targets legacy C that can't absorb one |
 
----
+## Building from Source
 
-## Getting Started
-
-### Prerequisites
-- GCC or Clang (Required for `OWNED` RAII features)
-- CMake 3.10+
-- Python 3.x (Optional: For Static Linting and Profiler HTML Generation)
-
-### Build Instructions
+**Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+, Python 3.x (optional — static lint and profiler HTML generation).
 
 ```bash
 git clone https://github.com/PandiaJason/OwnedC.git
@@ -120,25 +177,23 @@ make
 ctest --output-on-failure
 ```
 
-### Included Demonstrations
-The repository comes with a comprehensive suite of examples. Run them to see the features in action:
-- `build/owned_http_server`: A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings.
-- `build/demo_profiler`: Generates a massive JSON graph of your memory layout, visualizing leaks.
-- `build/demo_lint`: See the offline Borrow Checker `tools/ownedc_lint.py` in action.
-- `build/demo_cpp`: First-class C++ `owned_ptr<T>` usage in action.
-- `build/demo_kernel`: Execution in a simulated `NO_STDLIB` embedded bare-metal setting.
-- `build/demo_generics`: Creating strongly-typed Vectors with zero `void*` casts.
-- `build/demo_future`: Spawning async tasks that safely transfer memory ownership across thread boundaries.
-- `build/demo_channel`: Passing memory sequentially using MPSC channels between multiple threads.
-- `build/demo_arena`: Dropping arrays of bump pointer objects simultaneously.
-- `build/demo_allocator`: Enterprise Custom Allocator Integration.
-- `build/demo_file` & `demo_socket`: Safe File I/O and Sockets.
-- `build/demo_mutex` & `demo_thread_safe`: Concurrency Safety and Auto-joining.
-- `build/demo_result`: Rust-Like Error Handling (`Result<T, E>`).
-- `build/demo_raii`: Auto-cleanup in action.
-- `build/demo_rc` & `demo_rc_cycle`: GC & Reference Counting.
-- `build/demo_string`, `demo_array`, `demo_vector`: Bounds-checked Collections.
-- `build/demo_hybrid_cheri`: CHERI Hybrid Architecture mockup.
+Demonstration binaries are built to `build/`, covering each subsystem in the Feature Matrix above — run `./build/demo_raii`, `./build/demo_threads`, etc. individually, or `./build/demo_full_showcase` for a combined walkthrough.
+
+## Security
+
+OwnedC has not had an external security audit. Do not rely on it for memory safety guarantees in security-critical contexts until a 1.0 release. To report a suspected vulnerability, use GitHub's private vulnerability reporting (Security tab → Report a vulnerability) rather than a public issue.
+
+## Contributing
+
+Issues and pull requests are welcome. For anything beyond a small fix, please open an issue describing the change first — the ownership model has subtle invariants shared across the registry, arena, and CHERI backends, and a short design discussion up front avoids rework.
+
+## Roadmap
+
+- Profile and fix the hash-map collision behavior driving `owner_malloc` overhead at scale.
+- Multi-threaded arena support (currently single-thread by design).
+- Promote Experimental subsystems to Beta as test coverage lands, starting with concurrency primitives.
+- External security review ahead of a 1.0 release.
 
 ## License
-This project is licensed under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](LICENSE) file for full details.
+
+GNU General Public License v3.0 (GPLv3). See [LICENSE](LICENSE) for full details.
