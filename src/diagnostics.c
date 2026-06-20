@@ -2,6 +2,7 @@
 
 
 void ownedc_diagnostics_fatal(const char* reason, void* ptr, const char* file, int line) {
+    (void)reason; (void)ptr; (void)file; (void)line;
     OWNEDC_PRINTF("\n========================================\n");
     OWNEDC_PRINTF("OwnedC: Ownership Violation Detected\n");
     OWNEDC_PRINTF("========================================\n");
@@ -20,6 +21,7 @@ void ownedc_diagnostics_fatal(const char* reason, void* ptr, const char* file, i
 
 
 void ownedc_diagnostics_report_leak(void* ptr, const char* file, int line, size_t size) {
+    (void)ptr; (void)file; (void)line; (void)size;
     OWNEDC_PRINTF("\n========================================\n");
     OWNEDC_PRINTF("OwnedC: Memory Leak Detected\n");
     OWNEDC_PRINTF("========================================\n");

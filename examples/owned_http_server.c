@@ -62,7 +62,9 @@ void* handle_client(void* arg) {
             safe_string_append(response, "</body></html>");
             
             // Send the perfectly safe, dynamic response
-            write(client_sock, safe_string_cstr(response), response->length);
+            if (write(client_sock, safe_string_cstr(response), response->length) < 0) {
+                // Ignore write errors for the demo
+            }
         }
     }
     

@@ -63,6 +63,7 @@ static void insert_meta(alloc_meta_t* meta) {
     registry[idx] = meta;
 }
 
+#ifndef OWNEDC_NO_STDLIB
 static void check_leaks(void) {
     OWNEDC_LOCK();
     int leaked_count = 0;
@@ -82,6 +83,7 @@ static void check_leaks(void) {
         OWNEDC_EXIT(1);
     }
 }
+#endif
 
 /* Pluggable Allocator Defaults */
 static ownedc_malloc_fn global_malloc = OWNEDC_DEFAULT_MALLOC;

@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include "ownedc.h"
 #include "ownedc_region.h"
 #include <stdio.h>

@@ -2,6 +2,7 @@
 
 // In a real kernel, these would write to a UART or VGA buffer
 void my_uart_print(const char* str) {
+    (void)str;
     // Just a stub for our demo. We can't actually use printf because NO_STDLIB is active!
     // But we'll cheat for the demo to show it works, or we can just not print anything and use a global variable.
 }
