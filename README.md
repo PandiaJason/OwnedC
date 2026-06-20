@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.jpg" alt="OwnedC Logo" width="200"/>
+</p>
+
 # OwnedC: Rust-Inspired Memory Safety for C
 [![C/C++ CI](https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml/badge.svg)](https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml)
 
