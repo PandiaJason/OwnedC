@@ -85,15 +85,15 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 - **Static Ownership Analysis:** Includes `ownedc_lint.py`, acting as a heuristical "Borrow Checker" running offline at compile-time to intercept memory leaks, double-frees, and use-after-free before you run your executable.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
 - **First-Class C++ RAII Wrappers:** Use `ownedc.hpp` for `owned_ptr<T>` and `borrowed_ptr<T>` native C++ classes that automatically bridge C++ constructors/destructors to our robust C memory safety backend.
-- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) Actor-model messaging passing without race conditions!
-- **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks.
-- **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads.
+- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) Actor-model message passing without race conditions. *(Requires OS Threading)*
+- **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks. *(Requires OS Support)*
+- **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads. *(Requires OS Threading)*
 - **Type-Safe Generics:** Macro-driven `OWNEDC_DEFINE_VECTOR(T)` natively generates type-safe arrays with completely transparent void* castings.
-- **Kernel & Embedded Mode:** `OWNEDC_NO_STDLIB` totally abstracts standard libraries out of the library for bare-metal OS or embedded microcontroller execution.
+- **Kernel & Embedded Mode:** `OWNEDC_NO_STDLIB` totally abstracts standard libraries out of the library for bare-metal OS or embedded microcontroller execution. *(Note: Concurrency, Sockets, and File I/O features are inherently disabled in this mode).*
 - **Pluggable Allocators:** Integrates with `jemalloc`, `mimalloc`, or game-engine allocators via `ownedc_set_allocators()`.
-- **High-Performance Lock-Free Arenas:** Features `ownedc_arena.h` for massive, lock-free bump-pointer throughput where 10,000 objects can be dropped instantly in O(1) time.
+- **High-Performance Arenas:** Features `safe_region` for single-threaded, zero-overhead bump-pointer throughput where bulk allocations can be dropped instantly in O(1) time.
 - **Shared Ownership & GC:** Implements `owned_rc_t` for reference counting, and advanced cycle detection via `owned_rc_collect_cycles()` to reclaim cyclic memory graphs.
-- **Memory Profiler GUI:** Automatically exports the full ownership graph memory states using `ownership_dump_json()` and generates a beautiful HTML dashboard using `tools/ownedc_profiler.py`.
+- **Memory Profiler GUI:** Automatically exports the full ownership graph memory states using `ownership_dump_json()` and generates an HTML dashboard using `tools/ownedc_profiler.py`.
 - **Rust-Like Error Handling:** Features `owned_result_t` (Result types) and the `TRY_UNWRAP` macro to force explicit error handling.
 - **Deep-Freeing Arrays:** Provides `owned_array_t` for bounds-checked arrays that recursively free elements upon destruction.
 - **CHERI Integration:** `ownedc_cheri.h` transparently upgrades allocations to capability pointers on Morello hardware.
@@ -122,15 +122,15 @@ ctest --output-on-failure
 
 ### Included Demonstrations
 The repository comes with a comprehensive suite of examples. Run them to see the features in action:
-- `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings.
+- `build/owned_http_server`: A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings.
 - `build/demo_profiler`: Generates a massive JSON graph of your memory layout, visualizing leaks.
-- `build/demo_lint`: See the offline Borrow Checker `tools/ownedc_lint.py` in action!
+- `build/demo_lint`: See the offline Borrow Checker `tools/ownedc_lint.py` in action.
 - `build/demo_cpp`: First-class C++ `owned_ptr<T>` usage in action.
 - `build/demo_kernel`: Execution in a simulated `NO_STDLIB` embedded bare-metal setting.
 - `build/demo_generics`: Creating strongly-typed Vectors with zero `void*` casts.
-- `build/demo_future`: Spawning async tasks that safely transfer memory ownership across thread boundaries!
+- `build/demo_future`: Spawning async tasks that safely transfer memory ownership across thread boundaries.
 - `build/demo_channel`: Passing memory sequentially using MPSC channels between multiple threads.
-- `build/demo_arena`: Dropping millions of Lock-Free Bump pointer objects simultaneously.
+- `build/demo_arena`: Dropping arrays of bump pointer objects simultaneously.
 - `build/demo_allocator`: Enterprise Custom Allocator Integration.
 - `build/demo_file` & `demo_socket`: Safe File I/O and Sockets.
 - `build/demo_mutex` & `demo_thread_safe`: Concurrency Safety and Auto-joining.
