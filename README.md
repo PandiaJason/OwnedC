@@ -61,9 +61,9 @@ For a memory-safety tool, the primary concern is the overhead introduced by safe
 |---------------------|--------------------|-----------------|-------------------------------|-----------------------|
 | Raw `malloc` / `free` | 0.0616s | **Baseline (1.0x)** | 0.0296s | **Baseline (1.0x)** |
 | `owner_malloc` / `free` | 9.2519s | **150.1x** | 5.5906s | **188.7x** |
-| `safe_region` (Arena) | 0.0097s | **0.15x (6.3x Faster)** | N/A | N/A |
+| `safe_region` (Arena) | 0.0097s | **0.15x (6.3x Faster)** | N/A (Single-thread by design) | N/A |
 
-*Takeaway:* Individual `owner_malloc` calls introduce significant overhead (~150x-188x), heavily exacerbated by global hash map collisions and mutex lock contention under highly concurrent loads. However, developers can switch to the `safe_region` Arena Allocator for bulk allocations. The arena completely bypasses the granular global hash-map, achieving speeds **~6.3x faster** than single-threaded raw `malloc` while fully retaining leak-protection and memory safety.
+*Takeaway:* Individual `owner_malloc` calls introduce significant overhead (~150x-188x), heavily exacerbated by global hash map collisions and mutex lock contention under highly concurrent loads. Because of this, `owner_malloc` is intended for cold paths and setup code. For high-performance hot paths, `safe_region` (Arenas) is the production-viable allocator. The arena completely bypasses the granular global hash-map, achieving speeds **~6.3x faster** than single-threaded raw `malloc` while fully retaining leak-protection and memory safety. Arenas are inherently single-thread-by-design to achieve these lock-free speeds; for concurrent workloads, developers spawn thread-local arenas.
 
 ---
 
@@ -72,9 +72,9 @@ For a memory-safety tool, the primary concern is the overhead introduced by safe
 The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs compared to prior art:
 
 - **Checked C (Microsoft Research):** Checked C introduces sweeping syntactic changes (`_Ptr`, `_Array_ptr`) requiring extensive codebase rewrites. OwnedC attempts to remain closer to standard C syntax via attributes and macros.
-- **ASan (AddressSanitizer):** ASan is heavily instrumented and generally restricted to debug builds. While we have not performed extensive 1-to-1 memory bloat comparisons, OwnedC is designed conceptually as a production-capable runtime layer rather than an exclusively diagnostic tool.
+- **ASan (AddressSanitizer):** ASan is heavily instrumented and generally restricted to debug builds (running ~2-3x overhead). OwnedC serves a different architectural purpose: `owner_malloc` acts as a strict diagnostic and setup layer, while `safe_region` serves as the production-capable runtime layer for your high-performance paths.
 - **CHERI / Morello:** CHERI provides hardware-enforced spatial memory safety. Rather than competing with CHERI, OwnedC **integrates** with it. When compiled on a CHERI toolchain, OwnedC automatically upgrades its pointers to `__capability` bounded hardware pointers via `ownedc_cheri.h`.
-- **Rust:** Rust provides zero-cost abstractions and static safety. OwnedC is intended for legacy C codebases that simply cannot afford a full language rewrite, leaning on dynamic runtime checks as a compromise.
+- **Rust:** Rust provides zero-cost abstractions and static safety. OwnedC is intended for legacy C codebases that simply cannot afford a full language rewrite, leaning on dynamic runtime checks and lock-free arenas as a compromise.
 
 ---
 
