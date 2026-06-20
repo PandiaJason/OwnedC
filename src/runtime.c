@@ -68,6 +68,21 @@ static void check_leaks(void) {
     }
 }
 
+/* Pluggable Allocator Defaults */
+static ownedc_malloc_fn global_malloc = malloc;
+static ownedc_free_fn global_free = free;
+static ownedc_realloc_fn global_realloc = realloc;
+
+void ownedc_set_allocators(ownedc_malloc_fn m_fn, ownedc_free_fn f_fn, ownedc_realloc_fn r_fn) {
+    if (m_fn) global_malloc = m_fn;
+    if (f_fn) global_free = f_fn;
+    if (r_fn) global_realloc = r_fn;
+}
+
+void ownedc_init(void) {
+    // Optional explicit initialization
+}
+
 /* We use macros in a real header to capture file/line, but for now we'll mock or wrap.
  * To make it compatible, we'll redefine malloc/free using macros later or expose specific versions. 
  * For this phase, we'll just track generic allocations. We'll use __builtin_return_address for simple tracking or just pass unknown.
@@ -82,12 +97,12 @@ void* owner_malloc_internal(size_t size, const char* file, int line) {
     }
     pthread_mutex_unlock(&registry_mutex);
 
-    void* ptr = malloc(size);
+    void* ptr = global_malloc(size);
     if (!ptr) return NULL;
 
-    alloc_meta_t* meta = (alloc_meta_t*)malloc(sizeof(alloc_meta_t));
+    alloc_meta_t* meta = (alloc_meta_t*)global_malloc(sizeof(alloc_meta_t));
     if (!meta) {
-        free(ptr);
+        global_free(ptr);
         return NULL;
     }
 
@@ -143,7 +158,7 @@ void* owner_realloc(void* ptr, size_t size) {
         ownedc_diagnostics_fatal("Thread Ownership Violation (Realloc)", ptr, NULL, 0);
     }
 
-    void* new_ptr = realloc(ptr, size);
+    void* new_ptr = global_realloc(ptr, size);
     if (new_ptr && new_ptr != ptr) {
         // Pointer changed, update registry
         unsigned int old_idx = hash_ptr(ptr);
@@ -200,7 +215,7 @@ void owner_free_internal(void* ptr, const char* file, int line) {
 
     // We don't actually call free(ptr) yet to allow catching use-after-free via poison.
     // In a real implementation we might quarantine it. For phase 1, we'll free it but keep metadata.
-    free(ptr);
+    global_free(ptr);
 }
 
 void owner_free(void* ptr) {

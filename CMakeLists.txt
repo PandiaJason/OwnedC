@@ -24,6 +24,8 @@ add_library(ownedc SHARED
     src/ownedc_string.c
     src/ownedc_array.c
     src/ownedc_rc.c
+    src/ownedc_file.c
+    src/ownedc_mutex.c
 )
 target_link_libraries(ownedc Threads::Threads)
 
@@ -60,6 +62,15 @@ target_link_libraries(demo_array ownedc)
 
 add_executable(demo_rc examples/demo_rc.c)
 target_link_libraries(demo_rc ownedc)
+
+add_executable(demo_file examples/demo_file.c)
+target_link_libraries(demo_file ownedc)
+
+add_executable(demo_mutex examples/demo_mutex.c)
+target_link_libraries(demo_mutex ownedc Threads::Threads)
+
+add_executable(demo_allocator examples/demo_allocator.c)
+target_link_libraries(demo_allocator ownedc)
 
 # Testing
 enable_testing()

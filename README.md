@@ -83,6 +83,9 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 - **Automated Memory Management (RAII):** Utilizes `__attribute__((cleanup))` to provide deterministic resource management.
 - **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
+- **Concurrency Safety:** Provides `owned_mutex_t` and `OWNED_LOCK` to automatically unlock mutexes upon returning, eliminating deadlocks.
+- **Resource Safety (Safe File I/O):** Provides `safe_file_t` and `OWNED_FILE` to automatically close file descriptors, eliminating FD leaks.
+- **Pluggable Allocators:** Integrates with `jemalloc`, `mimalloc`, or game-engine allocators via `ownedc_set_allocators()`.
 - **Shared Ownership:** Implements `owned_rc_t` for robust reference counting, securely destroying data exactly when the final reference drops.
 - **Safe Strings & Collections:** Includes bounds-checked, auto-resizing strings (`safe_string`) and generic vectors (`safe_vector`) protected by the ownership runtime.
 - **Deep-Freeing Arrays:** Provides `owned_array_t`, a bounds-checked array that automatically iterates and recursively frees its contained pointers upon destruction.
@@ -114,6 +117,9 @@ ctest --output-on-failure
 ### Included Demonstrations
 The repository comes with a comprehensive suite of examples. Run them to see the features in action:
 - `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings for request parsing.
+- `build/demo_allocator`: Enterprise Custom Allocator Integration.
+- `build/demo_file`: Safe File I/O and Descriptor Tracking.
+- `build/demo_mutex`: Concurrency Safety and Deadlock Prevention.
 - `build/demo_raii`: Auto-cleanup in action.
 - `build/demo_rc`: Shared Ownership and Reference Counting.
 - `build/demo_string`: Safe Strings with bounds-checking and auto-resizing.

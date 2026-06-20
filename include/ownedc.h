@@ -28,6 +28,14 @@ typedef enum {
   #define OWNEDC_REALLOC_ATTR
 #endif
 
+/* Pluggable Allocator Types */
+typedef void* (*ownedc_malloc_fn)(size_t);
+typedef void  (*ownedc_free_fn)(void*);
+typedef void* (*ownedc_realloc_fn)(void*, size_t);
+
+/* Allows dropping in jemalloc, mimalloc, or custom allocators */
+void ownedc_set_allocators(ownedc_malloc_fn m_fn, ownedc_free_fn f_fn, ownedc_realloc_fn r_fn);
+
 /* Public allocation API */
 void* owner_malloc(size_t size) OWNEDC_MALLOC_ATTR;
 void* owner_calloc(size_t num, size_t size) OWNEDC_CALLOC_ATTR;
