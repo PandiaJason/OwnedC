@@ -22,6 +22,7 @@ add_library(ownedc SHARED
     src/collections.c
     src/region.c
     src/ownedc_string.c
+    src/ownedc_array.c
 )
 target_link_libraries(ownedc Threads::Threads)
 
@@ -52,6 +53,9 @@ target_link_libraries(owned_http_server ownedc Threads::Threads)
 
 add_executable(demo_string examples/demo_string.c)
 target_link_libraries(demo_string ownedc)
+
+add_executable(demo_array examples/demo_array.c)
+target_link_libraries(demo_array ownedc)
 
 # Testing
 enable_testing()

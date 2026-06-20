@@ -84,6 +84,7 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 - **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
 - **Safe Strings & Collections:** Includes bounds-checked, auto-resizing strings (`safe_string`) and generic vectors (`safe_vector`) protected by the ownership runtime.
+- **Deep-Freeing Arrays:** Provides `owned_array_t`, a bounds-checked array that automatically iterates and recursively frees its contained pointers upon destruction.
 - **High-Performance Arenas:** Features `safe_region` for massive bump-pointer throughput.
 - **CHERI Integration:** `ownedc_cheri.h` transparently upgrades allocations to capability pointers on Morello hardware.
 - **Static Ownership Analysis:** Includes `ownedc-analyzer.py` for build-time AST validation.
@@ -114,6 +115,7 @@ The repository comes with a comprehensive suite of examples. Run them to see the
 - `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings for request parsing.
 - `build/demo_raii`: Auto-cleanup in action.
 - `build/demo_string`: Safe Strings with bounds-checking and auto-resizing.
+- `build/demo_array`: Deep-Freeing Arrays of Pointers.
 - `build/demo_vector`: Safe Collections and bounds-checking.
 - `build/demo_region`: High-Performance Arenas.
 - `build/demo_threads`: Thread Safety & Ownership.
