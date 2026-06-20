@@ -1,5 +1,6 @@
 #include "ownedc.h"
 #include "ownedc_region.h"
+#include "ownedc_string.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,27 +42,28 @@ void* handle_client(void* arg) {
         char* token = strtok(buffer, "\r\n");
         if (token) {
             // Allocate a copy of the request line in the Arena
-            char* req_line = safe_region_alloc(request_arena, strlen(token) + 1);
+            char* req_line = (char*)safe_region_alloc(request_arena, strlen(token) + 1);
             strcpy(req_line, token);
             printf("[Thread %lu] Request: %s\n", (unsigned long)pthread_self(), req_line);
-        }
-        
-        // 4. Send a highly professional HTTP response
-        const char* http_response = 
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "<html>"
-            "<head><title>OwnedC Web Server</title></head>"
-            "<body style=\"font-family: sans-serif; text-align: center; margin-top: 50px;\">"
-            "<h1>🚀 Powered by OwnedC</h1>"
-            "<p>This multi-threaded C web server is 100% memory safe!</p>"
-            "<p>Zero memory leaks, guaranteed RAII cleanup, and Region Arena request contexts.</p>"
-            "</body>"
-            "</html>";
             
-        write(client_sock, http_response, strlen(http_response));
+            // 4. Use Safe Strings to dynamically build the HTTP response
+            OWNED_STRING safe_string_t* response = safe_string_new("HTTP/1.1 200 OK\r\n");
+            safe_string_append(response, "Content-Type: text/html\r\n");
+            safe_string_append(response, "Connection: close\r\n\r\n");
+            
+            safe_string_append(response, "<html><head><title>OwnedC Web Server</title></head>");
+            safe_string_append(response, "<body style=\"font-family: sans-serif; text-align: center; margin-top: 50px;\">");
+            safe_string_append(response, "<h1>🚀 Powered by OwnedC</h1>");
+            safe_string_append(response, "<p>This multi-threaded C web server is 100% memory safe!</p>");
+            safe_string_append(response, "<p>You requested: <strong>");
+            safe_string_append(response, req_line);
+            safe_string_append(response, "</strong></p>");
+            safe_string_append(response, "<p>Zero memory leaks, guaranteed RAII cleanup, and Region Arena request contexts.</p>");
+            safe_string_append(response, "</body></html>");
+            
+            // Send the perfectly safe, dynamic response
+            write(client_sock, safe_string_cstr(response), response->length);
+        }
     }
     
     // 5. Cleanup Connection State
