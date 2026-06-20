@@ -107,6 +107,7 @@ ctest --output-on-failure
 
 ### Included Demonstrations
 The repository comes with a comprehensive suite of examples. Run them to see the features in action:
+- `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership and Region Arenas for request contexts.
 - `build/demo_raii`: Auto-cleanup in action.
 - `build/demo_vector`: Safe Collections and bounds-checking.
 - `build/demo_region`: High-Performance Arenas.

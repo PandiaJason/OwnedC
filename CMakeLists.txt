@@ -46,6 +46,9 @@ target_link_libraries(demo_region ownedc Threads::Threads)
 add_executable(demo_threads examples/demo_threads.c)
 target_link_libraries(demo_threads ownedc Threads::Threads)
 
+add_executable(owned_http_server examples/owned_http_server.c)
+target_link_libraries(owned_http_server ownedc Threads::Threads)
+
 # Testing
 enable_testing()
 
