@@ -50,6 +50,9 @@ target_link_libraries(demo_threads ownedc Threads::Threads)
 enable_testing()
 
 # Normal tests
+add_executable(benchmark tests/benchmark.c)
+target_link_libraries(benchmark ownedc Threads::Threads)
+
 add_executable(test_hybrid_compile tests/test_hybrid_compile.c)
 target_link_libraries(test_hybrid_compile ownedc Threads::Threads)
 add_test(NAME HybridCompileTest COMMAND test_hybrid_compile)
