@@ -8,7 +8,7 @@ OwnedC is a lightweight memory safety framework and static analysis toolkit that
 
 ---
 
-## ⚡ The API at a Glance
+## The API at a Glance
 
 Unlike traditional C where memory management relies on developer discipline, OwnedC enforces deterministic, scope-bound resource cleanup.
 
@@ -44,7 +44,7 @@ void process_data() {
 
 ---
 
-## 📊 Performance & Benchmarks
+## Performance & Benchmarks
 
 For a memory-safety tool, the primary concern is the overhead introduced by safety checks. OwnedC's dynamic registry requires taking a mutex and tracking metadata for standard allocations.
 
@@ -60,7 +60,7 @@ Based on our internal benchmarks (`tests/benchmark.c` with 100,000 operations):
 
 ---
 
-## 🏗 Prior Art & Comparisons
+## Prior Art & Comparisons
 
 The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs compared to prior art:
 
@@ -71,7 +71,7 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 
 ---
 
-## ⚙️ Core Features
+## Core Features
 
 - **Automated Memory Management (RAII):** Utilizes `__attribute__((cleanup))` to provide deterministic resource management.
 - **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime. Attempting to deallocate memory while active borrows exist will cleanly abort the program.
@@ -83,7 +83,7 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - GCC or Clang (Required for `OWNED` RAII features)
