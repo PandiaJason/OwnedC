@@ -82,19 +82,21 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 
 - **Automated Memory Management (RAII):** Utilizes `__attribute__((cleanup))` to provide deterministic resource management.
 - **Dynamic Borrow Checking:** Enforces strict memory borrowing rules at runtime.
+- **Static Ownership Analysis:** Includes `ownedc_lint.py`, acting as a heuristical "Borrow Checker" running offline at compile-time to intercept memory leaks, double-frees, and use-after-free before you run your executable.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
+- **First-Class C++ RAII Wrappers:** Use `ownedc.hpp` for `owned_ptr<T>` and `borrowed_ptr<T>` native C++ classes that automatically bridge C++ constructors/destructors to our robust C memory safety backend.
+- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) Actor-model messaging passing without race conditions!
 - **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks.
-- **Concurrency Safety:** Provides `owned_mutex_t` and `OWNED_LOCK` to automatically unlock mutexes upon returning, eliminating deadlocks.
 - **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads.
+- **Type-Safe Generics:** Macro-driven `OWNEDC_DEFINE_VECTOR(T)` natively generates type-safe arrays with completely transparent void* castings.
+- **Kernel & Embedded Mode:** `OWNEDC_NO_STDLIB` totally abstracts standard libraries out of the library for bare-metal OS or embedded microcontroller execution.
 - **Pluggable Allocators:** Integrates with `jemalloc`, `mimalloc`, or game-engine allocators via `ownedc_set_allocators()`.
-- **Shared Ownership:** Implements `owned_rc_t` for robust reference counting.
-- **Garbage Collection (Cycle Detection):** Advanced reference counting includes `owned_rc_collect_cycles()` to forcefully detect and reclaim isolated cyclic graphs.
-- **Rust-Like Error Handling:** Features `owned_result_t` (Result types) and the `TRY_UNWRAP` macro to force explicit error handling, bypassing null pointer dereferences.
-- **Safe Strings & Collections:** Includes bounds-checked, auto-resizing strings (`safe_string`) and generic vectors (`safe_vector`) protected by the ownership runtime.
-- **Deep-Freeing Arrays:** Provides `owned_array_t`, a bounds-checked array that automatically iterates and recursively frees its contained pointers upon destruction.
-- **High-Performance Arenas:** Features `safe_region` for massive bump-pointer throughput.
+- **High-Performance Lock-Free Arenas:** Features `ownedc_arena.h` for massive, lock-free bump-pointer throughput where 10,000 objects can be dropped instantly in O(1) time.
+- **Shared Ownership & GC:** Implements `owned_rc_t` for reference counting, and advanced cycle detection via `owned_rc_collect_cycles()` to reclaim cyclic memory graphs.
+- **Memory Profiler GUI:** Automatically exports the full ownership graph memory states using `ownership_dump_json()` and generates a beautiful HTML dashboard using `tools/ownedc_profiler.py`.
+- **Rust-Like Error Handling:** Features `owned_result_t` (Result types) and the `TRY_UNWRAP` macro to force explicit error handling.
+- **Deep-Freeing Arrays:** Provides `owned_array_t` for bounds-checked arrays that recursively free elements upon destruction.
 - **CHERI Integration:** `ownedc_cheri.h` transparently upgrades allocations to capability pointers on Morello hardware.
-- **Static Ownership Analysis:** Includes `ownedc-analyzer.py` for build-time AST validation.
 
 > **Note on Standard Compatibility:** The core dynamic registry is fully C99/C11 compliant. However, the RAII macro (`OWNED`) explicitly relies on the `__attribute__((cleanup))` extension. Therefore, while the library compiles universally, the automatic-cleanup feature specifically requires **GCC or Clang**.
 
@@ -105,6 +107,7 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 ### Prerequisites
 - GCC or Clang (Required for `OWNED` RAII features)
 - CMake 3.10+
+- Python 3.x (Optional: For Static Linting and Profiler HTML Generation)
 
 ### Build Instructions
 
@@ -119,23 +122,23 @@ ctest --output-on-failure
 
 ### Included Demonstrations
 The repository comes with a comprehensive suite of examples. Run them to see the features in action:
-- `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings for request parsing.
+- `build/owned_http_server`: **Real-World Use Case!** A multi-threaded web server demonstrating Thread Ownership, Region Arenas, and Safe Strings.
+- `build/demo_profiler`: Generates a massive JSON graph of your memory layout, visualizing leaks.
+- `build/demo_lint`: See the offline Borrow Checker `tools/ownedc_lint.py` in action!
+- `build/demo_cpp`: First-class C++ `owned_ptr<T>` usage in action.
+- `build/demo_kernel`: Execution in a simulated `NO_STDLIB` embedded bare-metal setting.
+- `build/demo_generics`: Creating strongly-typed Vectors with zero `void*` casts.
+- `build/demo_future`: Spawning async tasks that safely transfer memory ownership across thread boundaries!
+- `build/demo_channel`: Passing memory sequentially using MPSC channels between multiple threads.
+- `build/demo_arena`: Dropping millions of Lock-Free Bump pointer objects simultaneously.
 - `build/demo_allocator`: Enterprise Custom Allocator Integration.
-- `build/demo_file`: Safe File I/O and Descriptor Tracking.
-- `build/demo_socket`: Safe Network Sockets.
-- `build/demo_mutex`: Concurrency Safety and Deadlock Prevention.
-- `build/demo_thread_safe`: Safe Managed Threads (Auto-join/detach).
+- `build/demo_file` & `demo_socket`: Safe File I/O and Sockets.
+- `build/demo_mutex` & `demo_thread_safe`: Concurrency Safety and Auto-joining.
 - `build/demo_result`: Rust-Like Error Handling (`Result<T, E>`).
 - `build/demo_raii`: Auto-cleanup in action.
-- `build/demo_rc`: Shared Ownership and Reference Counting.
-- `build/demo_rc_cycle`: Garbage Collection (RC Cycle Detection).
-- `build/demo_string`: Safe Strings with bounds-checking and auto-resizing.
-- `build/demo_array`: Deep-Freeing Arrays of Pointers.
-- `build/demo_vector`: Safe Collections and bounds-checking.
-- `build/demo_region`: High-Performance Arenas.
-- `build/demo_threads`: Thread Safety & Ownership.
+- `build/demo_rc` & `demo_rc_cycle`: GC & Reference Counting.
+- `build/demo_string`, `demo_array`, `demo_vector`: Bounds-checked Collections.
 - `build/demo_hybrid_cheri`: CHERI Hybrid Architecture mockup.
-- `build/demo_full_showcase`: A comprehensive demonstration unifying all features.
 
 ## License
 This project is licensed under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](LICENSE) file for full details.

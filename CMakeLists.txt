@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(OwnedC C)
+project(OwnedC C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -29,6 +29,8 @@ add_library(ownedc SHARED
     src/ownedc_socket.c
     src/ownedc_thread.c
     src/ownedc_future.c
+    src/ownedc_channel.c
+    src/ownedc_arena.c
 )
 target_link_libraries(ownedc Threads::Threads)
 
@@ -112,6 +114,15 @@ target_link_libraries(demo_future ownedc)
 
 add_executable(demo_profiler examples/demo_profiler.c)
 target_link_libraries(demo_profiler ownedc)
+
+add_executable(demo_channel examples/demo_channel.c)
+target_link_libraries(demo_channel ownedc)
+
+add_executable(demo_cpp examples/demo_cpp.cpp)
+target_link_libraries(demo_cpp ownedc)
+
+add_executable(demo_arena examples/demo_arena.c)
+target_link_libraries(demo_arena ownedc)
 
 # Testing
 enable_testing()
