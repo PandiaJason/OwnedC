@@ -85,7 +85,7 @@ The memory-safety landscape for C is extensive. OwnedC makes specific trade-offs
 - **Static Ownership Analysis:** Includes `ownedc_lint.py`, acting as a heuristical "Borrow Checker" running offline at compile-time to intercept memory leaks, double-frees, and use-after-free before you run your executable.
 - **Thread Ownership Verification:** Protects against data races by prohibiting unauthorized cross-thread deallocation.
 - **First-Class C++ RAII Wrappers:** Use `ownedc.hpp` for `owned_ptr<T>` and `borrowed_ptr<T>` native C++ classes that automatically bridge C++ constructors/destructors to our robust C memory safety backend.
-- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) Actor-model message passing without race conditions. *(Requires OS Threading)*
+- **Concurrency Safety & Channels:** Provides `owned_mutex_t` for deadlocks, `ownedc_future.c` for Safe Async Promises & Futures, and `ownedc_channel.c` for Multi-Producer Single-Consumer (MPSC) channel-based message passing without race conditions. *(Requires OS Threading)*
 - **Resource Safety (Safe File I/O & Sockets):** Provides `safe_file_t` and `safe_socket_t` wrappers to automatically close descriptors, eliminating FD leaks. *(Requires OS Support)*
 - **Safe Managed Threads:** Implements `OWNED_THREAD` to automatically join or detach threads when handles drop out of scope, eliminating zombie threads. *(Requires OS Threading)*
 - **Type-Safe Generics:** Macro-driven `OWNEDC_DEFINE_VECTOR(T)` natively generates type-safe arrays with completely transparent void* castings.
