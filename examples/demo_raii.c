@@ -1,7 +1,7 @@
 #include "ownedc.h"
 #include <stdio.h>
 
-void do_work() {
+void do_work(void) {
     printf("[RAII Demo] Allocating buffer...\n");
     // Memory is automatically freed when the function exits
     OWNED void* buffer = owner_malloc(1024);
@@ -12,7 +12,7 @@ void do_work() {
     printf("[RAII Demo] Exiting function. Buffer will be automatically freed.\n");
 }
 
-int main() {
+int main(void) {
     printf("--- OwnedC RAII Auto-Cleanup Demo ---\n");
     do_work();
     

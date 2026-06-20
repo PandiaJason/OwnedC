@@ -9,7 +9,7 @@
 #define NUM_THREADS 8
 #define ALLOC_SIZE 32
 
-double get_time_sec() {
+double get_time_sec(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
@@ -42,7 +42,7 @@ void* thread_owner_malloc(void* arg) {
     return NULL;
 }
 
-int main() {
+int main(void) {
     printf("--- OwnedC Benchmark ---\n");
     printf("Total Allocations: %d\n", NUM_ALLOCS);
     printf("Allocation Size:   %d bytes\n\n", ALLOC_SIZE);

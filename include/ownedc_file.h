@@ -1,7 +1,7 @@
 #ifndef OWNEDC_FILE_H
 #define OWNEDC_FILE_H
 
-#include <stdio.h>
+#include "ownedc_env.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus

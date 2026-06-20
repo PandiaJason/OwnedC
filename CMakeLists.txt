@@ -28,8 +28,23 @@ add_library(ownedc SHARED
     src/ownedc_mutex.c
     src/ownedc_socket.c
     src/ownedc_thread.c
+    src/ownedc_future.c
 )
 target_link_libraries(ownedc Threads::Threads)
+
+# Bare-Metal Kernel Mode Target (NO_STDLIB)
+add_library(ownedc_kernel STATIC
+    src/runtime.c
+    src/diagnostics.c
+    src/collections.c
+    src/region.c
+    src/ownedc_string.c
+    src/ownedc_array.c
+    src/ownedc_rc.c
+    src/ownedc_future.c
+)
+target_compile_definitions(ownedc_kernel PUBLIC OWNEDC_NO_STDLIB)
+target_include_directories(ownedc_kernel PUBLIC include)
 
 # Examples
 add_executable(demo examples/demo.c)
@@ -85,6 +100,18 @@ target_link_libraries(demo_thread_safe ownedc Threads::Threads)
 
 add_executable(demo_rc_cycle examples/demo_rc_cycle.c)
 target_link_libraries(demo_rc_cycle ownedc)
+
+add_executable(demo_kernel examples/demo_kernel.c)
+target_link_libraries(demo_kernel ownedc_kernel)
+
+add_executable(demo_generics examples/demo_generics.c)
+target_link_libraries(demo_generics ownedc)
+
+add_executable(demo_future examples/demo_future.c)
+target_link_libraries(demo_future ownedc)
+
+add_executable(demo_profiler examples/demo_profiler.c)
+target_link_libraries(demo_profiler ownedc)
 
 # Testing
 enable_testing()

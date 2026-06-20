@@ -1,7 +1,7 @@
 #include "ownedc_array.h"
 #include "ownedc.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "ownedc_env.h"
+
 
 owned_array_t* owned_array_new(size_t capacity) {
     owned_array_t* arr = (owned_array_t*)owner_malloc(sizeof(owned_array_t));
@@ -11,7 +11,7 @@ owned_array_t* owned_array_new(size_t capacity) {
     if (capacity > 0) {
         // Allocate the underlying array of void* pointers.
         // We use calloc to ensure all pointers start as NULL.
-        arr->data = (void**)calloc(capacity, sizeof(void*));
+        arr->data = (void**)owner_calloc(capacity, sizeof(void*));
         if (!arr->data) {
             owner_free(arr);
             return NULL;
@@ -27,8 +27,8 @@ void owned_array_set(owned_array_t* arr, size_t index, void* ptr) {
     if (!arr) return;
     
     if (index >= arr->capacity) {
-        fprintf(stderr, "OWNEDC FATAL: Array bounds violation! Index %zu, Capacity %zu\n", index, arr->capacity);
-        abort();
+        OWNEDC_PRINTF("OWNEDC FATAL: Array bounds violation! Index %zu, Capacity %zu\n", index, arr->capacity);
+        OWNEDC_ABORT();
     }
     
     // If there is already a pointer there, we should free it to prevent leaks!
@@ -43,8 +43,8 @@ void* owned_array_get(owned_array_t* arr, size_t index) {
     if (!arr) return NULL;
     
     if (index >= arr->capacity) {
-        fprintf(stderr, "OWNEDC FATAL: Array bounds violation! Index %zu, Capacity %zu\n", index, arr->capacity);
-        abort();
+        OWNEDC_PRINTF("OWNEDC FATAL: Array bounds violation! Index %zu, Capacity %zu\n", index, arr->capacity);
+        OWNEDC_ABORT();
     }
     
     return arr->data[index];
@@ -65,7 +65,7 @@ void owned_array_free(owned_array_t* arr) {
         }
         
         // Free the internal data buffer
-        free(arr->data);
+        owner_free(arr->data);
         arr->data = NULL;
     }
     

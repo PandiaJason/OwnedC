@@ -58,6 +58,7 @@ static inline void owner_free_cleanup(void* ptr) {
 
 /* Ownership Operations */
 void ownership_transfer(void* from, void* to);
+void ownership_claim(void* ptr);
 void ownership_borrow(void* ptr);
 void ownership_release(void* ptr);
 void ownership_share(void* ptr);
@@ -67,6 +68,7 @@ void ownership_inspect(void* ptr);
 void ownership_dump(void);
 void ownership_dump_borrows(void);
 void ownership_stats(void);
+void ownership_dump_json(const char* filepath);
 
 #ifdef __cplusplus
 }

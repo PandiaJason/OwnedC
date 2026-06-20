@@ -80,7 +80,7 @@ void* handle_client(void* arg) {
     return NULL;
 }
 
-int main() {
+int main(void) {
     int server_fd;
     struct sockaddr_in address;
     int opt = 1;

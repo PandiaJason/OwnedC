@@ -1,7 +1,7 @@
 #include "ownedc_file.h"
 #include "ownedc.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "ownedc_env.h"
+
 
 safe_file_t* safe_fopen(const char* filename, const char* mode) {
     FILE* raw_file = fopen(filename, mode);

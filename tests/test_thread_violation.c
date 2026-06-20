@@ -4,7 +4,7 @@
 
 void* ptr = NULL;
 
-void* thread_func(void* arg) {
+void* thread_func(void* arg) { (void)arg;
     // Thread B tries to free Thread A's memory without sharing
     owner_free(ptr);
     return NULL;

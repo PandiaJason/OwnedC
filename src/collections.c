@@ -1,6 +1,6 @@
 #include "ownedc_collections.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "ownedc_env.h"
+
 
 extern void ownedc_diagnostics_fatal(const char* reason, void* ptr, const char* file, int line);
 
@@ -50,6 +50,25 @@ void* safe_vector_get(safe_vector_t* vec, size_t index) {
 
 void safe_vector_free(safe_vector_t* vec) {
     if (!vec) return;
-    owner_free(vec->data);
+    if (vec->data) {
+        owner_free(vec->data);
+    }
     owner_free(vec);
+}
+
+void safe_vector_remove(safe_vector_t* vec, size_t index) {
+    if (!vec || !vec->data) {
+        OWNEDC_PRINTF("OWNEDC FATAL: Null vector access.\n");
+        OWNEDC_ABORT();
+    }
+    if (index >= vec->length) {
+        OWNEDC_PRINTF("OWNEDC FATAL: Vector bounds violation! Index %zu, Length %zu\n", index, vec->length);
+        OWNEDC_ABORT();
+    }
+    
+    // Shift elements left
+    for (size_t i = index; i < vec->length - 1; i++) {
+        vec->data[i] = vec->data[i + 1];
+    }
+    vec->length--;
 }

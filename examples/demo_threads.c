@@ -14,7 +14,7 @@ void* thread_worker(void* arg) {
     return NULL;
 }
 
-int main() {
+int main(void) {
     printf("--- OwnedC Thread Ownership & Safety Demo ---\n");
     
     // Allocated on the main thread

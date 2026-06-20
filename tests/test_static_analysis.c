@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "ownedc.h"
 
-int main() {
+int main(void) {
     // This should trigger a warning: use of raw malloc
     void* p1 = malloc(10);
     

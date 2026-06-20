@@ -9,7 +9,8 @@ int main(void) {
     owner_free(ptr);
 
     // This should trigger a UAF detection because we try to realloc a freed pointer
-    owner_realloc(ptr, 200);
+    void* unused = owner_realloc(ptr, 200);
+    (void)unused;
 
     return 0;
 }

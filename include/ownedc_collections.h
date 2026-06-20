@@ -27,6 +27,14 @@ void* safe_vector_get(safe_vector_t* vec, size_t index);
  * If the items are owned, they should be freed separately. */
 void safe_vector_free(safe_vector_t* vec);
 
+/* Get the current length of the vector */
+static inline size_t safe_vector_length(safe_vector_t* vec) {
+    return vec ? vec->length : 0;
+}
+
+/* Remove an item at the specified index. Aborts if out of bounds. */
+void safe_vector_remove(safe_vector_t* vec, size_t index);
+
 #ifdef __cplusplus
 }
 #endif

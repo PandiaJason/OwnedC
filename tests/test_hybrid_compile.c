@@ -1,6 +1,6 @@
 #include "ownedc.h"
 
-int main() {
+int main(void) {
     /* 
      * Tests __attribute__((warn_unused_result))
      * If compiled with -Werror, this file will fail to compile if the 

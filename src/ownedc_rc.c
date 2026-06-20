@@ -1,7 +1,7 @@
 #include "ownedc_rc.h"
 #include "ownedc.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "ownedc_env.h"
+
 
 static owned_rc_t* gc_head = NULL;
 

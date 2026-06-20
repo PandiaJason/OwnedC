@@ -1,7 +1,7 @@
 #include "ownedc_thread.h"
 #include "ownedc.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "ownedc_env.h"
+
 
 safe_thread_t* safe_thread_spawn(void *(*start_routine)(void *), void *arg) {
     safe_thread_t* thread = (safe_thread_t*)owner_malloc(sizeof(safe_thread_t));

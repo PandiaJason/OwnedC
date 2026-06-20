@@ -1,6 +1,6 @@
 #include "ownedc_mutex.h"
 #include "ownedc.h"
-#include <stdio.h>
+#include "ownedc_env.h"
 
 safe_mutex_t* safe_mutex_new(pthread_mutex_t* raw_mutex) {
     if (!raw_mutex) return NULL;

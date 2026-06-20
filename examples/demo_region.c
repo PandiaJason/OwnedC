@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-int main() {
+int main(void) {
     printf("--- OwnedC High-Performance Region (Arena) Demo ---\n");
     
     // Create a region with 4KB chunks

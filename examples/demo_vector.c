@@ -1,7 +1,7 @@
 #include "ownedc_collections.h"
 #include <stdio.h>
 
-int main() {
+int main(void) {
     printf("--- OwnedC Safe Vector Demo ---\n");
     
     // Create a vector for integers with initial capacity of 2

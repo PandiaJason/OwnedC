@@ -3,7 +3,7 @@
 #include <pthread.h>
 #include <unistd.h> // Ensure unistd.h is included for usleep/sleep depending on needs, but we don't strictly need it
 
-void* thread_func(void* arg) {
+void* thread_func(void* arg) { (void)arg;
     void* ptr = owner_malloc(50);
     ownership_inspect(ptr);
     owner_free(ptr);
