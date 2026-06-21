@@ -170,6 +170,41 @@ To prove that OwnedC is capable of bringing memory safety to industry-grade C to
 
 By binding SQLite's pluggable memory allocator methods (`sqlite3_mem_methods`) to point directly to OwnedC's dynamic registry (`owner_malloc`, `owner_free`, `owner_realloc`, and `owner_malloc_usable_size`), all internal database allocations (such as page caches, node data, and parser buffers) are tracked.
 
+```
+                      ┌─────────────────────────┐
+                      │    sqlite_ownedc (App)  │
+                      └────────────┬────────────┘
+                                   │
+                         [Configures Allocator]
+                                   │
+                                   ▼
+                      ┌─────────────────────────┐
+                      │       SQLite Core       │
+                      └────────────┬────────────┘
+                                   │
+                      [Redirects Heap Allocations]
+                                   │
+                                   ▼
+                      ┌─────────────────────────┐
+                      │   sqlite3_mem_methods   │
+                      └────────────┬────────────┘
+                                   │
+                         [Allocator Interface]
+                                   │
+                                   ▼
+                      ┌─────────────────────────┐
+                      │ OwnedC Runtime Registry │
+                      │  (Tracks size/borrows)  │
+                      └──────┬────────────┬─────┘
+                             │            │
+             [Double-Frees]  │            │  [Statement Leaks]
+                             ▼            ▼
+                      ┌──────────┐   ┌──────────┐
+                      │ Runtime  │   │   Leak   │
+                      │  Abort   │   │  Report  │
+                      └──────────┘   └──────────┘
+```
+
 ### Running the SQLite Showcase
 
 Build the project normally using CMake, then execute the following targets:
