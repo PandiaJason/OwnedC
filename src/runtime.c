@@ -427,3 +427,12 @@ void ownership_dump_json(const char* filepath) {
     OWNEDC_PRINTF("ownership_dump_json is not available in NO_STDLIB mode.\n");
 }
 #endif
+
+size_t owner_malloc_usable_size(void* ptr) {
+    if (!ptr) return 0;
+    OWNEDC_LOCK();
+    alloc_meta_t* meta = find_meta(ptr);
+    size_t size = meta ? meta->size : 0;
+    OWNEDC_UNLOCK();
+    return size;
+}

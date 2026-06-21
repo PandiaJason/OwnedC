@@ -7,11 +7,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 # Treat warnings as errors for safety
 if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic")
+    # SQLite has many casting warnings, so we disable pedantic errors for its compilation
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 endif()
 
 # Include directories
-include_directories(include)
+include_directories(include .)
 
 find_package(Threads REQUIRED)
 
@@ -182,4 +183,8 @@ add_executable(test_thread_violation tests/test_thread_violation.c)
 target_link_libraries(test_thread_violation ownedc Threads::Threads)
 add_test(NAME ThreadViolationTest COMMAND test_thread_violation)
 set_tests_properties(ThreadViolationTest PROPERTIES WILL_FAIL TRUE)
+
+# SQLite Integration Showcase Target
+add_executable(sqlite_ownedc examples/sqlite_ownedc.c sqlite3.c)
+target_link_libraries(sqlite_ownedc ownedc Threads::Threads)
 

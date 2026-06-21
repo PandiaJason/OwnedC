@@ -41,6 +41,7 @@ void* owner_malloc(size_t size) OWNEDC_MALLOC_ATTR;
 void* owner_calloc(size_t num, size_t size) OWNEDC_CALLOC_ATTR;
 void* owner_realloc(void* ptr, size_t size) OWNEDC_REALLOC_ATTR;
 void  owner_free(void* ptr);
+size_t owner_malloc_usable_size(void* ptr);
 
 /* RAII Cleanup helper for GCC/Clang */
 static inline void owner_free_cleanup(void* ptr) {
