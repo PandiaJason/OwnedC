@@ -164,6 +164,37 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 | CHERI / Morello | Hardware-enforced capability pointers | OwnedC integrates with CHERI rather than competing with it |
 | Rust | Compile-time ownership, zero-cost | Requires a rewrite; OwnedC targets legacy C that can't absorb one |
 
+## Real-World Showcase: Memory-Safe SQLite Integration
+
+To prove that OwnedC is capable of bringing memory safety to industry-grade C tools, we integrated it directly into **SQLite (v3.47.0)**. 
+
+By binding SQLite's pluggable memory allocator methods (`sqlite3_mem_methods`) to point directly to OwnedC's dynamic registry (`owner_malloc`, `owner_free`, `owner_realloc`, and `owner_malloc_usable_size`), all internal database allocations (such as page caches, node data, and parser buffers) are tracked.
+
+### Running the SQLite Showcase
+
+Build the project normally using CMake, then execute the following targets:
+
+1. **Normal Run (0 Leaks)**:
+   ```bash
+   ./build/sqlite_ownedc
+   ```
+   *Expected Output*: Performs table creations, insertions, and SELECT queries. Prints:
+   `OwnedC Stats: 0 active allocations, 196 freed allocations.` on clean exit.
+
+2. **Simulated Leak Interception**:
+   ```bash
+   ./build/sqlite_ownedc --simulate-leak
+   ```
+   *Expected Output*: Simulates a bug where statement handles are unfinalized. OwnedC intercepts the unreleased statements on exit and dumps all 58 leaks:
+   `OwnedC: Found 58 memory leaks. Terminating.`
+
+3. **Double-Free Interception**:
+   ```bash
+   ./build/sqlite_ownedc --simulate-double-free
+   ```
+   *Expected Output*: Attempts to release an SQLite pointer twice. OwnedC's dynamic borrow-checker catches this instantly at runtime, printing:
+   `OwnedC: Ownership Violation Detected: Double-free` and terminating safely before memory corruption occurs.
+
 ## Building from Source
 
 **Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+, Python 3.x (optional — static lint and profiler HTML generation).
