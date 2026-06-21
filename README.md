@@ -168,7 +168,7 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 
 | Dimension | C / C++ | OwnedC | Rust | Java | Python |
 |---|---|---|---|---|---|
-| **Memory Safety** | ❌ Manual (unsafe) | 🟢 Dynamic Tracking (safe) | 🟢 Compile-time Checked (safe) | 🟢 Garbage Collected (safe) | 🟢 Reference Counted + GC (safe) |
+| **Memory Safety** | Manual (unsafe) | Dynamic Tracking (safe) | Compile-time Checked (safe) | Garbage Collected (safe) | Reference Counted + GC (safe) |
 | **Runtime Overhead** | None | Low (Arenas) to High (Tracked Alloc) | Zero (Zero-cost abstraction) | Medium (GC pauses & JIT) | High (Interpreter & dynamic lookup) |
 | **Compile-time Safety** | Weak | Heuristic Static Analysis | Strong (Static Borrow Checker) | Strong (Type & Boundary checked) | None (Dynamic language) |
 | **Concurrency Model** | Unsafe (races possible) | Thread ownership verification | Thread safety enforced at compile-time | Thread safety via synchronized/locks | GIL (Single-threaded execution) |
