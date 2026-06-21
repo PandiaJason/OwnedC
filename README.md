@@ -164,6 +164,17 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 | CHERI / Morello | Hardware-enforced capability pointers | OwnedC integrates with CHERI rather than competing with it |
 | Rust | Compile-time ownership, zero-cost | Requires a rewrite; OwnedC targets legacy C that can't absorb one |
 
+## Language Comparison Matrix
+
+| Dimension | C / C++ | OwnedC | Rust | Java | Python |
+|---|---|---|---|---|---|
+| **Memory Safety** | ❌ Manual (unsafe) | 🟢 Dynamic Tracking (safe) | 🟢 Compile-time Checked (safe) | 🟢 Garbage Collected (safe) | 🟢 Reference Counted + GC (safe) |
+| **Runtime Overhead** | None | Low (Arenas) to High (Tracked Alloc) | Zero (Zero-cost abstraction) | Medium (GC pauses & JIT) | High (Interpreter & dynamic lookup) |
+| **Compile-time Safety** | Weak | Heuristic Static Analysis | Strong (Static Borrow Checker) | Strong (Type & Boundary checked) | None (Dynamic language) |
+| **Concurrency Model** | Unsafe (races possible) | Thread ownership verification | Thread safety enforced at compile-time | Thread safety via synchronized/locks | GIL (Single-threaded execution) |
+| **Retrofitting Legacy C** | Native | **Yes (Zero-code changes via allocator config)** | No (Requires complete rewrite) | No (Requires complete rewrite/JNI) | No (Requires complete rewrite/FFI) |
+| **Binary size & VM** | Tiny | Small (Tiny runtime library) | Small | Large (Requires JRE/JVM) | Large (Requires interpreter) |
+
 ## Real-World Showcase: Memory-Safe SQLite Integration
 
 To prove that OwnedC is capable of bringing memory safety to industry-grade C tools, we integrated it directly into **SQLite (v3.47.0)**. 
