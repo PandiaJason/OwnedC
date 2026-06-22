@@ -281,6 +281,12 @@ Build the project using CMake, then execute the showcase binary:
    ========================================
    ```
 
+### Key Findings from Multi-Library Integration
+
+* **Unified Allocator Redirects Across Diverse Library APIs**: Swapping allocators on multiple production-grade libraries concurrently is fully functional using their native hook mechanisms (`cJSON_InitHooks`, `xmlMemSetup`, and `CRYPTO_set_mem_functions`).
+* **Precise Internals Visibility (OpenSSL File/Line Context)**: Since OpenSSL allocator hooks forward the exact source file and line number of the calling location, OwnedC successfully traces leaks back to specific lines inside OpenSSL's internal source files (e.g., `crypto/evp/digest.c:131`).
+* **OpenSSL/libxml2 Lazy Globals Cleanup**: Internal global static structures allocated dynamically on first use by OpenSSL and libxml2 are automatically cleaned up at process exit prior to OwnedC's exit checker, ensuring a clean 0-leak execution report.
+
 ## Building from Source
 
 **Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+, Python 3.x (optional — static lint and profiler HTML generation).
