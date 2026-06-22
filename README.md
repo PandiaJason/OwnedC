@@ -20,6 +20,15 @@ OwnedC is a memory safety framework for C that brings ownership tracking, scope-
 
 OwnedC is a research prototype. It has not undergone external security review, and the performance characteristics of its core tracking path are documented, not hidden — see [Performance](#performance) before deciding where in your codebase to use it.
 
+## Core Concept: Standard C with Language-Level Safety
+
+OwnedC is **not a new programming language** or compiler fork. It is a library and tooling extension for standard C (C99/C11) that runs on standard compilers (GCC/Clang). It brings modern language-level safety paradigms directly into standard C:
+
+* **Scope-Bound RAII**: Using compiler cleanup attributes (`__attribute__((cleanup))`), the `OWNED` macro automatically frees dynamic memory when variables leave their block scope. This replicates C++ destructors or Rust's automatic drop mechanisms.
+* **Dynamic Borrow Checker**: A thread-safe runtime metadata registry intercepts allocations and frees, dynamically enforcing ownership boundaries (automatically flagging double-frees and use-after-free conditions).
+* **Native Static Analyzer**: A compiled C binary (`ownedc_lint`) scans source files at build time to detect leaks, double-frees, and use-after-free issues statically, without requiring Python or external runtimes.
+* **Zero-Rewrite Safety**: Unlike Rust or Zig, which require a complete codebase rewrite, OwnedC allows legacy C libraries (like SQLite, cJSON, libxml2, and OpenSSL) to achieve runtime memory safety instantly by simply swapping their internal memory allocation hooks.
+
 ## Project Status
 
 OwnedC is pre-1.0. APIs may change without notice between commits. The table below reflects maturity per subsystem as of this writing; it should be kept current as test coverage changes, and verified against actual CI results rather than taken at face value.
