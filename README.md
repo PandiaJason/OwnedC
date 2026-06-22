@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">OwnedC</h1>
-<p align="center"><i>Ownership-aware memory safety for C — without rewriting your codebase.</i></p>
+<p align="center"><i>Ownership verification and memory safety diagnostics for C — without rewriting your codebase.</i></p>
 
 <p align="center">
   <a href="https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml"><img src="https://github.com/PandiaJason/OwnedC/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
@@ -12,24 +12,24 @@
   <img src="https://img.shields.io/badge/status-research%20prototype-orange.svg" alt="Status"/>
 </p>
 
-<p align="center"><b>Stop rewriting legacy C in Rust. Retrofit memory safety, RAII, and dynamic borrow checking into SQLite, OpenSSL, and your own C codebases in 5 minutes—using standard compiler extensions.</b></p>
+<p align="center"><b>Stop rewriting legacy C in Rust. Retrofit ownership verification, RAII, and memory safety diagnostics into SQLite, OpenSSL, and your own C codebases in 5 minutes—using standard compiler extensions.</b></p>
 
 ---
 
 ## Overview
 
-OwnedC is a memory safety framework for C that brings ownership tracking, scope-bound RAII, and dynamic borrow checking to existing codebases, without requiring a migration to a different language. It is implemented as a dual-layer system: a runtime metadata registry performs dynamic ownership and borrow checks, and a compiled static analyzer (`ownedc_lint`) performs best-effort compile-time linting against the same ownership rules.
+OwnedC is an ownership verification framework for C that brings ownership tracking, scope-bound RAII, and dynamic ownership validation to existing codebases, without requiring a migration to a different language. It is implemented as a dual-layer system: a runtime metadata registry performs dynamic ownership and borrow verification, and a compiled static analyzer (`ownedc_lint`) performs best-effort compile-time linting against the same ownership rules.
 
 OwnedC is a research prototype. It has not undergone external security review, and the performance characteristics of its core tracking path are documented, not hidden — see [Performance](#performance) before deciding where in your codebase to use it.
 
-## Core Concept: Standard C with Language-Level Safety
+## Core Concept: Standard C with Dynamic Ownership Verification
 
 OwnedC is **not a new programming language** or compiler fork. It is a library and tooling extension for standard C (C99/C11) that runs on standard compilers (GCC/Clang). It brings modern language-level safety paradigms directly into standard C:
 
 * **Scope-Bound RAII**: Using compiler cleanup attributes (`__attribute__((cleanup))`), the `OWNED` macro automatically frees dynamic memory when variables leave their block scope. This replicates C++ destructors or Rust's automatic drop mechanisms.
-* **Dynamic Borrow Checker**: A thread-safe runtime metadata registry intercepts allocations and frees, dynamically enforcing ownership boundaries (automatically flagging double-frees and use-after-free conditions).
+* **Dynamic Ownership Verifier**: A thread-safe runtime metadata registry intercepts allocations and frees, dynamically verifying ownership boundaries (automatically flagging double-frees and use-after-free conditions).
 * **Native Static Analyzer**: A compiled C binary (`ownedc_lint`) scans source files at build time to detect leaks, double-frees, and use-after-free issues statically, without requiring Python or external runtimes.
-* **Zero-Rewrite Safety**: Unlike Rust or Zig, which require a complete codebase rewrite, OwnedC allows legacy C libraries (like SQLite, cJSON, libxml2, and OpenSSL) to achieve runtime memory safety instantly by simply swapping their internal memory allocation hooks.
+* **Zero-Rewrite Integration**: Unlike Rust or Zig, which require a complete codebase rewrite, OwnedC allows legacy C libraries (like SQLite, cJSON, libxml2, and OpenSSL) to integrate with ownership verification instantly by simply swapping their internal memory allocation hooks.
 
 ## Project Status
 
@@ -38,7 +38,7 @@ OwnedC is pre-1.0. APIs may change without notice between commits. The table bel
 | Subsystem | Status | Notes |
 |---|---|---|
 | RAII (`OWNED`, `owner_malloc`) | Beta | Functionally correct; high per-call overhead (see Performance) |
-| Dynamic Borrow Checking | Beta | Aborts on violation; covered by `tests/` |
+| Dynamic Ownership Verification | Beta | Aborts on violation; covered by `tests/` |
 | Static Lint (`ownedc_lint`) | Beta | Heuristic, not a sound type system — see Non-Goals |
 | Thread Ownership Verification | Beta | Single global registry; not yet stress-tested at high thread counts |
 | Arenas (`safe_region`) | Beta | Benchmarked; single-threaded by design |
@@ -149,7 +149,7 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 | Feature | Header / Tool | Requires |
 |---|---|---|
 | RAII auto-cleanup | `ownedc.h` (`OWNED`) | GCC or Clang (`__attribute__((cleanup))`) |
-| Dynamic borrow checking | `ownedc.h` | — |
+| Dynamic ownership verification | `ownedc.h` | — |
 | Static lint | `ownedc_lint` | — |
 | Thread ownership verification | `ownedc.h` | OS threading |
 | Arenas | `ownedc.h` (`safe_region`) | — |
@@ -171,15 +171,15 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 | Checked C (Microsoft Research) | New pointer syntax (`_Ptr`, `_Array_ptr`) | Requires source rewrite; OwnedC stays closer to standard C syntax |
 | AddressSanitizer | Compile-time instrumentation, debug-build use | ~2-3x overhead, diagnostic-only; OwnedC's `safe_region` targets production hot paths |
 | CHERI / Morello | Hardware-enforced capability pointers | OwnedC integrates with CHERI rather than competing with it |
-| Rust | Compile-time ownership, zero-cost | Requires a rewrite; OwnedC targets legacy C that can't absorb one |
+| Rust | Compile-time ownership, zero-cost guarantees | Requires a complete codebase rewrite; OwnedC retrofits verification onto legacy C |
 
 ## Language Comparison Matrix
 
 | Dimension | C / C++ | OwnedC | Rust | Java | Python |
 |---|---|---|---|---|---|
-| **Memory Safety** | Manual (unsafe) | Dynamic Tracking (safe) | Compile-time Checked (safe) | Garbage Collected (safe) | Reference Counted + GC (safe) |
+| **Memory Safety** | Manual (unsafe) | Dynamic Tracking (diagnostics) | Compile-time Checked (safe) | Garbage Collected (safe) | Reference Counted + GC (safe) |
 | **Runtime Overhead** | None | Low (Arenas) to High (Tracked Alloc) | Zero (Zero-cost abstraction) | Medium (GC pauses & JIT) | High (Interpreter & dynamic lookup) |
-| **Compile-time Safety** | Weak | Heuristic Static Analysis | Strong (Static Borrow Checker) | Strong (Type & Boundary checked) | None (Dynamic language) |
+| **Compile-time Safety** | Weak | Heuristic Static Analysis (non-sound) | Strong (Static Borrow Checker) | Strong (Type & Boundary checked) | None (Dynamic language) |
 | **Concurrency Model** | Unsafe (races possible) | Thread ownership verification | Thread safety enforced at compile-time | Thread safety via synchronized/locks | GIL (Single-threaded execution) |
 | **Retrofitting Legacy C** | Native | **Yes (Zero-code changes via allocator config)** | No (Requires complete rewrite) | No (Requires complete rewrite/JNI) | No (Requires complete rewrite/FFI) |
 | **Binary size & VM** | Tiny | Small (Tiny runtime library) | Small | Large (Requires JRE/JVM) | Large (Requires interpreter) |
@@ -247,7 +247,7 @@ Build the project normally using CMake, then execute the following targets:
    ```bash
    ./build/sqlite_ownedc --simulate-double-free
    ```
-   *Expected Output*: Attempts to release an SQLite pointer twice. OwnedC's dynamic borrow-checker catches this instantly at runtime, printing:
+   *Expected Output*: Attempts to release an SQLite pointer twice. OwnedC's dynamic ownership verifier catches this instantly at runtime, printing:
    `OwnedC: Ownership Violation Detected: Double-free` and terminating safely before memory corruption occurs.
 
 ### Why This Proves OwnedC is Powerful
@@ -310,6 +310,24 @@ ctest --output-on-failure
 ```
 
 Demonstration binaries are built to `build/`, covering each subsystem in the Feature Matrix above — run `./build/demo_raii`, `./build/demo_threads`, etc. individually, or `./build/demo_full_showcase` for a combined walkthrough.
+
+## Comparison to Existing Safety Tools
+
+If you are considering adopting or evaluating OwnedC, you may wonder how it compares to standard memory analysis tools:
+
+### Why not AddressSanitizer (ASan)?
+AddressSanitizer is a diagnostics-only compiler tool designed for debug/testing builds. It imposes a 2-3x CPU overhead and 2-4x memory overhead (due to massive shadow memory tables). It is not viable for production deployments. OwnedC's `safe_region` arenas run at zero overhead (often outperforming raw `malloc`), and its dynamic registry runs with minimal single-thread overhead (~3x), making it realistic to evaluate in production-like systems.
+
+### Why not Valgrind?
+Valgrind is an CPU-emulator-based analysis tool. Because it emulates instructions, it slows execution by 10x to 50x, making it entirely unusable outside of offline developer testing. OwnedC is a lightweight, natively compiled C library that links directly to the application.
+
+### Why not Rust?
+Rust provides compile-time safety guarantees and zero-cost abstractions, but adopting it requires rewriting millions of lines of legacy C codebases. OwnedC retrofits ownership verification and memory safety diagnostics onto legacy C applications in 5 minutes via pluggable allocator hooks, without changing the source code.
+
+### What bugs can OwnedC detect that ASan cannot?
+* **Thread-Ownership Violations**: ASan does not detect when Thread A frees memory allocated by Thread B. OwnedC validates thread ownership and aborts immediately.
+* **Active Borrow Violations**: ASan cannot detect when you free an object that has active references/borrows. OwnedC tracks borrows and blocks premature deallocations.
+* **Non-Heap Resource Leaks**: OwnedC's `OWNED` RAII model scales to non-heap system resources (like files and sockets), whereas ASan exclusively tracks memory.
 
 ## Security
 
