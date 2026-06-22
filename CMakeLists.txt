@@ -188,3 +188,25 @@ set_tests_properties(ThreadViolationTest PROPERTIES WILL_FAIL TRUE)
 add_executable(sqlite_ownedc examples/sqlite_ownedc.c sqlite3.c)
 target_link_libraries(sqlite_ownedc ownedc Threads::Threads)
 
+# JSON Parser Integration Showcase
+add_library(owned_json SHARED src/owned_json.c)
+target_link_libraries(owned_json ownedc)
+
+add_executable(demo_json examples/demo_json.c)
+target_link_libraries(demo_json owned_json ownedc)
+
+# Real cJSON Library Integration Showcase Target
+add_executable(cjson_ownedc examples/cjson_ownedc.c cJSON.c)
+target_link_libraries(cjson_ownedc ownedc Threads::Threads)
+
+# Multi-Library Integration Showcase Target (cJSON, libxml2, OpenSSL)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBXML2 REQUIRED libxml-2.0)
+pkg_check_modules(OPENSSL REQUIRED openssl)
+
+include_directories(${LIBXML2_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
+link_directories(${LIBXML2_LIBRARY_DIRS} ${OPENSSL_LIBRARY_DIRS})
+
+add_executable(real_libs_ownedc examples/real_libs_ownedc.c cJSON.c)
+target_link_libraries(real_libs_ownedc ownedc Threads::Threads ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
+

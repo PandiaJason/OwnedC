@@ -155,10 +155,10 @@ void* owner_calloc(size_t num, size_t size) {
     return ptr;
 }
 
-void* owner_realloc(void* ptr, size_t size) {
-    if (!ptr) return owner_malloc(size);
+void* owner_realloc_internal(void* ptr, size_t size, const char* file, int line) {
+    if (!ptr) return owner_malloc_internal(size, file, line);
     if (size == 0) {
-        owner_free(ptr);
+        owner_free_internal(ptr, file, line);
         return NULL;
     }
 
@@ -166,15 +166,15 @@ void* owner_realloc(void* ptr, size_t size) {
     alloc_meta_t* meta = find_meta(ptr);
     if (!meta) {
         OWNEDC_UNLOCK();
-        ownedc_diagnostics_fatal("Invalid Realloc (Untracked pointer)", ptr, NULL, 0);
+        ownedc_diagnostics_fatal("Invalid Realloc (Untracked pointer)", ptr, file, line);
     }
     if (meta->state == OWNEDC_STATE_FREED) {
         OWNEDC_UNLOCK();
-        ownedc_diagnostics_fatal("Use-after-free (Realloc on freed pointer)", ptr, NULL, 0);
+        ownedc_diagnostics_fatal("Use-after-free (Realloc on freed pointer)", ptr, file, line);
     }
     if (meta->state != OWNEDC_STATE_SHARED && !OWNEDC_THREAD_EQUAL(meta->owner_thread, OWNEDC_THREAD_SELF())) {
         OWNEDC_UNLOCK();
-        ownedc_diagnostics_fatal("Thread Ownership Violation (Realloc)", ptr, NULL, 0);
+        ownedc_diagnostics_fatal("Thread Ownership Violation (Realloc)", ptr, file, line);
     }
 
     void* new_ptr = global_realloc(ptr, size);
@@ -197,6 +197,10 @@ void* owner_realloc(void* ptr, size_t size) {
     }
     OWNEDC_UNLOCK();
     return new_ptr;
+}
+
+void* owner_realloc(void* ptr, size_t size) {
+    return owner_realloc_internal(ptr, size, NULL, 0);
 }
 
 void owner_free_internal(void* ptr, const char* file, int line) {

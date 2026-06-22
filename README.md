@@ -248,6 +248,39 @@ Integrating with a production-grade codebase like SQLite provides a definitive p
 - **Deterministic Exploit Interception**: A double-free or use-after-free under standard C leads to silent heap corruption and security vulnerabilities. Under OwnedC, the runtime registry intercepts it immediately and panics safely.
 - **Deep Allocation Visibility**: OwnedC successfully tracked, indexed, and freed all 196 dynamic memory allocations made during SQLite's table parsing, prepared statement executions, and connection cycles.
 
+## Real-World Showcase: Production Library Integrations (cJSON, libxml2, OpenSSL)
+
+To demonstrate how OwnedC scales across multiple distinct libraries in a single project, we built a showcase linking cJSON, libxml2, and OpenSSL simultaneously:
+
+- **cJSON**: Configured using `cJSON_InitHooks` to point to OwnedC.
+- **libxml2**: Swapped allocators via `xmlMemSetup`, capturing custom string duplications via `xmlStrdupFunc`.
+- **OpenSSL**: Replaced allocator functions using `CRYPTO_set_mem_functions`. Since OpenSSL exposes the calling file name and line number in its allocator hooks, OwnedC prints the exact line inside OpenSSL's internal codebase where any leak occurs.
+
+### Running the Multi-Library Showcase
+
+Build the project using CMake, then execute the showcase binary:
+
+1. **Normal Clean Run**:
+   ```bash
+   ./build/real_libs_ownedc
+   ```
+   *Expected Output*: Parses JSON, parses XML, and runs a SHA256 digest hash computation. It outputs a clean finished status. OpenSSL's lazy-initialized global structures are torn down automatically on exit before leak detection runs, resulting in 0 leaks reported.
+
+2. **Simulated Leak Interception**:
+   ```bash
+   ./build/real_libs_ownedc --simulate-leak
+   ```
+   *Expected Output*: Simulates a leak where an OpenSSL message digest context is left unallocated/unfreed. OwnedC intercepts this at exit and outputs the exact source location of the leak:
+   ```
+   ========================================
+   OwnedC: Memory Leak Detected
+   ========================================
+   Object Ptr: 0x1032ea900
+   Size: 72 bytes
+   Allocated at: crypto/evp/digest.c:131
+   ========================================
+   ```
+
 ## Building from Source
 
 **Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+, Python 3.x (optional — static lint and profiler HTML generation).

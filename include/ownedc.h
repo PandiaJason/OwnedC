@@ -43,6 +43,11 @@ void* owner_realloc(void* ptr, size_t size) OWNEDC_REALLOC_ATTR;
 void  owner_free(void* ptr);
 size_t owner_malloc_usable_size(void* ptr);
 
+/* Internal APIs exposing source code context */
+void* owner_malloc_internal(size_t size, const char* file, int line);
+void* owner_realloc_internal(void* ptr, size_t size, const char* file, int line);
+void  owner_free_internal(void* ptr, const char* file, int line);
+
 /* RAII Cleanup helper for GCC/Clang */
 static inline void owner_free_cleanup(void* ptr) {
     void* actual_ptr = *(void**)ptr;

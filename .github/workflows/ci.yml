@@ -14,11 +14,13 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Download SQLite Amalgamation
+    - name: Download SQLite and cJSON
       run: |
         curl -sSfL -o sqlite.zip https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip
         unzip sqlite.zip
         mv sqlite-amalgamation-3470000/* .
+        curl -sSfL -o cJSON.h https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.h
+        curl -sSfL -o cJSON.c https://raw.githubusercontent.com/DaveGamble/cJSON/master/cJSON.c
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
