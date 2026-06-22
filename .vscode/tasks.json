@@ -4,7 +4,7 @@
         {
             "label": "OwnedC Static Analysis",
             "type": "shell",
-            "command": "${workspaceFolder}/tools/ownedc-analyzer.py",
+            "command": "${workspaceFolder}/build/ownedc_lint",
             "args": [
                 "${file}"
             ],

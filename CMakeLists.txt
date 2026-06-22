@@ -210,3 +210,5 @@ link_directories(${LIBXML2_LIBRARY_DIRS} ${OPENSSL_LIBRARY_DIRS})
 add_executable(real_libs_ownedc examples/real_libs_ownedc.c cJSON.c)
 target_link_libraries(real_libs_ownedc ownedc Threads::Threads ${LIBXML2_LIBRARIES} ${OPENSSL_LIBRARIES})
 
+# Standalone Static Analyzer/Linter Tool
+add_executable(ownedc_lint tools/ownedc_lint.c)

@@ -16,7 +16,7 @@
 
 ## Overview
 
-OwnedC is a memory safety framework for C that brings ownership tracking, scope-bound RAII, and dynamic borrow checking to existing codebases, without requiring a migration to a different language. It is implemented as a dual-layer system: a runtime metadata registry performs dynamic ownership and borrow checks, and a static analyzer (`ownedc_lint.py`) performs best-effort compile-time linting against the same ownership rules.
+OwnedC is a memory safety framework for C that brings ownership tracking, scope-bound RAII, and dynamic borrow checking to existing codebases, without requiring a migration to a different language. It is implemented as a dual-layer system: a runtime metadata registry performs dynamic ownership and borrow checks, and a compiled static analyzer (`ownedc_lint`) performs best-effort compile-time linting against the same ownership rules.
 
 OwnedC is a research prototype. It has not undergone external security review, and the performance characteristics of its core tracking path are documented, not hidden — see [Performance](#performance) before deciding where in your codebase to use it.
 
@@ -28,7 +28,7 @@ OwnedC is pre-1.0. APIs may change without notice between commits. The table bel
 |---|---|---|
 | RAII (`OWNED`, `owner_malloc`) | Beta | Functionally correct; high per-call overhead (see Performance) |
 | Dynamic Borrow Checking | Beta | Aborts on violation; covered by `tests/` |
-| Static Lint (`ownedc_lint.py`) | Beta | Heuristic, not a sound type system — see Non-Goals |
+| Static Lint (`ownedc_lint`) | Beta | Heuristic, not a sound type system — see Non-Goals |
 | Thread Ownership Verification | Beta | Single global registry; not yet stress-tested at high thread counts |
 | Arenas (`safe_region`) | Beta | Benchmarked; single-threaded by design |
 | Safe Collections (vector / string / array) | Beta | |
@@ -40,7 +40,6 @@ OwnedC is pre-1.0. APIs may change without notice between commits. The table bel
 | Resource Safety: File / Socket wrappers | Experimental | |
 | Pluggable Allocators (jemalloc / mimalloc) | Experimental | |
 | Shared Ownership / Rc + cycle collection | Experimental | |
-| Memory Profiler GUI | Experimental | |
 | Kernel / Embedded mode (`NO_STDLIB`) | Experimental | Disables concurrency, sockets, file I/O |
 
 > **Beta**: implemented, tested, behavior is documented and benchmarked where relevant.
@@ -56,7 +55,7 @@ OwnedC is pre-1.0. APIs may change without notice between commits. The table bel
 
 ## Non-Goals
 
-- **Not a sound static analyzer.** `ownedc_lint.py` is heuristic. It catches common misuse patterns; it does not provide the compile-time guarantees of a type system like Rust's borrow checker.
+- **Not a sound static analyzer.** `ownedc_lint` is heuristic. It catches common misuse patterns; it does not provide the compile-time guarantees of a type system like Rust's borrow checker.
 - **Not a general-purpose garbage collector.** `owned_rc_t` targets cycle reclamation within bounded, explicitly-owned reference graphs — not whole-heap GC.
 - **Not a high-throughput general allocator.** `owner_malloc` trades throughput for traceability; `safe_region` is the allocator for performance-sensitive paths.
 - **Not production-hardened.** No external audit has been performed. Treat all safety guarantees as best-effort until a 1.0 release.
@@ -140,7 +139,7 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 |---|---|---|
 | RAII auto-cleanup | `ownedc.h` (`OWNED`) | GCC or Clang (`__attribute__((cleanup))`) |
 | Dynamic borrow checking | `ownedc.h` | — |
-| Static lint | `ownedc_lint.py` | Python 3.x |
+| Static lint | `ownedc_lint` | — |
 | Thread ownership verification | `ownedc.h` | OS threading |
 | Arenas | `ownedc.h` (`safe_region`) | — |
 | Safe collections (vector/string/array) | `ownedc.h` | — |
@@ -152,7 +151,6 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 | Safe file / socket I/O | `ownedc.h` (`safe_file_t`, `safe_socket_t`) | OS support |
 | Pluggable allocators | `ownedc_set_allocators()` | jemalloc / mimalloc (optional) |
 | Reference counting + cycle GC | `ownedc.h` (`owned_rc_t`) | — |
-| Profiler dashboard | `tools/ownedc_profiler.py` | Python 3.x |
 | Bare-metal / kernel mode | `OWNEDC_NO_STDLIB` | Disables threading, sockets, file I/O |
 
 ## Comparison to Prior Art
@@ -289,7 +287,7 @@ Build the project using CMake, then execute the showcase binary:
 
 ## Building from Source
 
-**Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+, Python 3.x (optional — static lint and profiler HTML generation).
+**Prerequisites:** GCC or Clang (required for `OWNED` RAII), CMake 3.10+.
 
 ```bash
 git clone https://github.com/PandiaJason/OwnedC.git
