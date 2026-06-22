@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/status-research%20prototype-orange.svg" alt="Status"/>
 </p>
 
-<p align="center"><b>Stop rewriting legacy C in Rust. Retrofit ownership verification, RAII, and memory safety diagnostics into SQLite, OpenSSL, and your own C codebases in 5 minutes—using standard compiler extensions.</b></p>
+<p align="center"><b>Stop rewriting legacy C in Rust. Retrofit ownership verification, RAII, and memory safety diagnostics into SQLite, OpenSSL, and your own C codebases without modifying their source code—using standard compiler extensions.</b></p>
 
 ---
 
@@ -106,7 +106,7 @@ void process_data() {
 
 OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_malloc`/`owner_free` call. That cost is real and is reported here directly rather than abstracted away.
 
-**Methodology:** Apple Silicon (macOS), Clang 15, `-O3`-equivalent release build via CMake, 500,000 allocations of 32 bytes each, via `tests/benchmark.c`.
+**Methodology:** Apple Silicon (macOS), Clang 15, `-O3`-equivalent release build via CMake, 500,000 allocations of 32 bytes each, via `tests/benchmark.c`. Updated following registry optimization (prefixed headers and sharded locks); previous numbers reflected hash-map collision degradation at scale.
 
 | Allocation Strategy | Single-Thread | Overhead | 8-Thread (Contention) | Overhead |
 |---|---|---|---|---|
@@ -119,16 +119,16 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 ## Architecture
 
 ```
-                 ┌─────────────────────────┐
-                 │   ownedc_lint.py (CI)    │   compile-time, heuristic
-                 └────────────┬─────────────┘
-                              │
-   source ──────────────────►│  build
-                              │
-                 ┌────────────▼─────────────┐
-                 │   ownedc.h runtime core   │
-                 │  (registry + borrow check)│
-                 └──────┬─────────────┬──────┘
+                  ┌─────────────────────────┐
+                  │       ownedc_lint (CI)  │   compile-time, heuristic
+                  └────────────┬─────────────┘
+                               │
+    source ──────────────────►│  build
+                               │
+                  ┌────────────▼─────────────┐
+                  │   ownedc.h runtime core  │
+                  │(registry + ownership chk)│
+                  └──────┬─────────────┬──────┘
                          │             │
               ┌──────────▼───┐   ┌─────▼──────────┐
               │ owner_malloc │   │  safe_region    │
@@ -175,14 +175,14 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 
 ## Language Comparison Matrix
 
-| Dimension | C / C++ | OwnedC | Rust | Java | Python |
-|---|---|---|---|---|---|
-| **Memory Safety** | Manual (unsafe) | Dynamic Tracking (diagnostics) | Compile-time Checked (safe) | Garbage Collected (safe) | Reference Counted + GC (safe) |
-| **Runtime Overhead** | None | Low (Arenas) to High (Tracked Alloc) | Zero (Zero-cost abstraction) | Medium (GC pauses & JIT) | High (Interpreter & dynamic lookup) |
-| **Compile-time Safety** | Weak | Heuristic Static Analysis (non-sound) | Strong (Static Borrow Checker) | Strong (Type & Boundary checked) | None (Dynamic language) |
-| **Concurrency Model** | Unsafe (races possible) | Thread ownership verification | Thread safety enforced at compile-time | Thread safety via synchronized/locks | GIL (Single-threaded execution) |
-| **Retrofitting Legacy C** | Native | **Yes (Zero-code changes via allocator config)** | No (Requires complete rewrite) | No (Requires complete rewrite/JNI) | No (Requires complete rewrite/FFI) |
-| **Binary size & VM** | Tiny | Small (Tiny runtime library) | Small | Large (Requires JRE/JVM) | Large (Requires interpreter) |
+| Dimension | C / C++ | OwnedC | Rust |
+|---|---|---|---|
+| **Memory Safety** | Manual (unsafe) | Dynamic Tracking (diagnostics) | Compile-time Checked (safe) |
+| **Runtime Overhead** | None | Low (Arenas) to Medium (Tracked Alloc) | Zero (Zero-cost abstraction) |
+| **Compile-time Safety** | Weak | Heuristic Static Analysis (non-sound) | Strong (Static Borrow Checker) |
+| **Concurrency Model** | Unsafe (races possible) | Thread ownership verification | Thread safety enforced at compile-time |
+| **Retrofitting Legacy C** | Native | **Yes (Zero-code changes via allocator config)** | No (Requires complete rewrite) |
+| **Binary size & VM** | Tiny | Small (Tiny runtime library) | Small |
 
 ## Real-World Showcase: Memory-Safe SQLite Integration
 
