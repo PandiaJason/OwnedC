@@ -12,6 +12,8 @@
   <img src="https://img.shields.io/badge/status-research%20prototype-orange.svg" alt="Status"/>
 </p>
 
+<p align="center"><b>Stop rewriting legacy C in Rust. Retrofit memory safety, RAII, and dynamic borrow checking into SQLite, OpenSSL, and your own C codebases in 5 minutes—using standard compiler extensions.</b></p>
+
 ---
 
 ## Overview
