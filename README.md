@@ -108,13 +108,13 @@ OwnedC's dynamic registry takes a mutex and tracks metadata on every `owner_mall
 
 **Methodology:** Apple Silicon (macOS), Clang 15, `-O3`-equivalent release build via CMake, 500,000 allocations of 32 bytes each, via `tests/benchmark.c`.
 
-| Allocation Strategy | Single-Thread | Overhead | 8-Thread | Overhead |
+| Allocation Strategy | Single-Thread | Overhead | 8-Thread (Contention) | Overhead |
 |---|---|---|---|---|
-| Raw `malloc`/`free` | 0.0616s | 1.0x (baseline) | 0.0296s | 1.0x (baseline) |
-| `owner_malloc`/`free` | 9.2519s | 150.1x | 5.5906s | 188.7x |
-| `safe_region` (arena) | 0.0097s | 0.15x (6.3x faster) | N/A — single-threaded by design | — |
+| Raw `malloc`/`free` | 0.0180s | 1.0x (baseline) | 0.0032s | 1.0x (baseline) |
+| `owner_malloc`/`free` | 0.0534s | 2.96x | 0.2261s | 70.25x |
+| `safe_region` (arena) | 0.0045s | 0.25x (4.0x faster) | N/A — single-threaded by design | — |
 
-**Guidance:** `owner_malloc` is for cold paths, setup code, and diagnostics — not hot loops. `safe_region` is the production-viable allocator for performance-sensitive code; for concurrent workloads, use one arena per thread. The overhead gap is attributed to global hash-map collisions and mutex contention in the registry and is tracked as a roadmap item (see below) rather than treated as a fixed cost of the design.
+**Guidance:** `owner_malloc` is optimized using prefix headers for O(1) metadata resolution (avoiding global lookups) and sharded locks to distribute thread contention. For performance-critical hot paths, `safe_region` remains the optimal zero-overhead choice.
 
 ## Architecture
 
@@ -321,7 +321,6 @@ Issues and pull requests are welcome. For anything beyond a small fix, please op
 
 ## Roadmap
 
-- Profile and fix the hash-map collision behavior driving `owner_malloc` overhead at scale.
 - Multi-threaded arena support (currently single-thread by design).
 - Promote Experimental subsystems to Beta as test coverage lands, starting with concurrency primitives.
 - External security review ahead of a 1.0 release.

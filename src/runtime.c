@@ -3,13 +3,12 @@
 
 #ifndef OWNEDC_NO_STDLIB
 #include <pthread.h>
-#define OWNEDC_LOCK() pthread_mutex_lock(&registry_mutex)
-#define OWNEDC_UNLOCK() pthread_mutex_unlock(&registry_mutex)
+#define OWNEDC_LOCK() pthread_mutex_lock(&global_lock)
+#define OWNEDC_UNLOCK() pthread_mutex_unlock(&global_lock)
 #define OWNEDC_THREAD_T pthread_t
 #define OWNEDC_THREAD_SELF() pthread_self()
 #define OWNEDC_THREAD_EQUAL(t1, t2) pthread_equal((t1), (t2))
 #else
-// In NO_STDLIB, threading is disabled by default. If the user is on an RTOS, they must provide their own locks.
 #define OWNEDC_LOCK() ((void)0)
 #define OWNEDC_UNLOCK() ((void)0)
 #define OWNEDC_THREAD_T size_t
@@ -20,10 +19,12 @@
 extern void ownedc_diagnostics_fatal(const char* reason, void* ptr, const char* file, int line);
 extern void ownedc_diagnostics_report_leak(void* ptr, const char* file, int line, size_t size);
 
-#define HASH_TABLE_SIZE 1024
+#define NUM_SHARDS 64
+#define OWNEDC_MAGIC 0x05E5CE1005E5CE10ULL
+#define QUARANTINE_SIZE 1024
 
 typedef struct alloc_meta {
-    void* ptr;
+    uint64_t magic;
     size_t size;
     ownership_state_t state;
     int borrow_count;
@@ -32,58 +33,44 @@ typedef struct alloc_meta {
     int alloc_line;
     const char* free_file;
     int free_line;
+    struct alloc_meta* prev;
     struct alloc_meta* next;
 } alloc_meta_t;
 
-static alloc_meta_t* registry[HASH_TABLE_SIZE] = {0};
+static alloc_meta_t* registry_heads[NUM_SHARDS] = {0};
 static int atexit_registered = 0;
-#ifndef OWNEDC_NO_STDLIB
-static pthread_mutex_t registry_mutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
-
-static unsigned int hash_ptr(void* ptr) {
-    return ((uintptr_t)ptr >> 4) % HASH_TABLE_SIZE;
-}
-
-static alloc_meta_t* find_meta(void* ptr) {
-    unsigned int idx = hash_ptr(ptr);
-    alloc_meta_t* curr = registry[idx];
-    while (curr) {
-        if (curr->ptr == ptr) {
-            return curr;
-        }
-        curr = curr->next;
-    }
-    return NULL;
-}
-
-static void insert_meta(alloc_meta_t* meta) {
-    unsigned int idx = hash_ptr(meta->ptr);
-    meta->next = registry[idx];
-    registry[idx] = meta;
-}
 
 #ifndef OWNEDC_NO_STDLIB
-static void check_leaks(void) {
-    OWNEDC_LOCK();
-    int leaked_count = 0;
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        alloc_meta_t* curr = registry[i];
-        while (curr) {
-            if (curr->state == OWNEDC_STATE_OWNED || curr->state == OWNEDC_STATE_SHARED) {
-                ownedc_diagnostics_report_leak(curr->ptr, curr->alloc_file, curr->alloc_line, curr->size);
-                leaked_count++;
-            }
-            curr = curr->next;
-        }
-    }
-    OWNEDC_UNLOCK();
-    if (leaked_count > 0) {
-        OWNEDC_PRINTF("OwnedC: Found %d memory leaks. Terminating.\n", leaked_count);
-        OWNEDC_EXIT(1);
-    }
-}
+static pthread_mutex_t global_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t registry_mutexes[NUM_SHARDS] = {
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER
+};
+#define SHARD_LOCK(idx) pthread_mutex_lock(&registry_mutexes[idx])
+#define SHARD_UNLOCK(idx) pthread_mutex_unlock(&registry_mutexes[idx])
+
+static pthread_mutex_t quarantine_mutex = PTHREAD_MUTEX_INITIALIZER;
+#else
+#define SHARD_LOCK(idx) ((void)(idx))
+#define SHARD_UNLOCK(idx) ((void)(idx))
 #endif
+
+static alloc_meta_t* quarantine[QUARANTINE_SIZE] = {0};
+static int quarantine_tail = 0;
 
 /* Pluggable Allocator Defaults */
 static ownedc_malloc_fn global_malloc = OWNEDC_DEFAULT_MALLOC;
@@ -100,11 +87,82 @@ void ownedc_init(void) {
     // Optional explicit initialization
 }
 
-/* We use macros in a real header to capture file/line, but for now we'll mock or wrap.
- * To make it compatible, we'll redefine malloc/free using macros later or expose specific versions. 
- * For this phase, we'll just track generic allocations. We'll use __builtin_return_address for simple tracking or just pass unknown.
- * Wait, without macros we can't get file/line easily. Let's add macros to ownedc.h later, or just accept NULL file/line for standard calls.
- */
+static inline unsigned int get_shard_idx(void* ptr) {
+    return ((uintptr_t)ptr >> 4) % NUM_SHARDS;
+}
+
+static inline alloc_meta_t* get_meta(void* ptr) {
+    if (!ptr) return NULL;
+    alloc_meta_t* meta = (alloc_meta_t*)((char*)ptr - sizeof(alloc_meta_t));
+    if (meta->magic == OWNEDC_MAGIC) {
+        return meta;
+    }
+    return NULL;
+}
+
+static void insert_meta(alloc_meta_t* meta) {
+    void* user_ptr = (void*)((char*)meta + sizeof(alloc_meta_t));
+    unsigned int idx = get_shard_idx(user_ptr);
+    SHARD_LOCK(idx);
+    meta->prev = NULL;
+    meta->next = registry_heads[idx];
+    if (registry_heads[idx]) {
+        registry_heads[idx]->prev = meta;
+    }
+    registry_heads[idx] = meta;
+    SHARD_UNLOCK(idx);
+}
+
+static void remove_meta(alloc_meta_t* meta) {
+    void* user_ptr = (void*)((char*)meta + sizeof(alloc_meta_t));
+    unsigned int idx = get_shard_idx(user_ptr);
+    SHARD_LOCK(idx);
+    if (meta->prev) {
+        meta->prev->next = meta->next;
+    } else if (registry_heads[idx] == meta) {
+        registry_heads[idx] = meta->next;
+    }
+    if (meta->next) {
+        meta->next->prev = meta->prev;
+    }
+    meta->prev = NULL;
+    meta->next = NULL;
+    SHARD_UNLOCK(idx);
+}
+
+#ifndef OWNEDC_NO_STDLIB
+static void check_leaks(void) {
+    int leaked_count = 0;
+    for (int i = 0; i < NUM_SHARDS; i++) {
+        SHARD_LOCK(i);
+        alloc_meta_t* curr = registry_heads[i];
+        while (curr) {
+            if (curr->state == OWNEDC_STATE_OWNED || curr->state == OWNEDC_STATE_SHARED) {
+                void* user_ptr = (void*)((char*)curr + sizeof(alloc_meta_t));
+                ownedc_diagnostics_report_leak(user_ptr, curr->alloc_file, curr->alloc_line, curr->size);
+                leaked_count++;
+            }
+            curr = curr->next;
+        }
+        SHARD_UNLOCK(i);
+    }
+
+    // Clean up quarantine memory at exit
+    pthread_mutex_lock(&quarantine_mutex);
+    for (int i = 0; i < QUARANTINE_SIZE; i++) {
+        if (quarantine[i]) {
+            global_free(quarantine[i]);
+            quarantine[i] = NULL;
+        }
+    }
+    pthread_mutex_unlock(&quarantine_mutex);
+
+    if (leaked_count > 0) {
+        OWNEDC_PRINTF("OwnedC: Found %d memory leaks. Terminating.\n", leaked_count);
+        OWNEDC_EXIT(1);
+    }
+}
+#endif
 
 void* owner_malloc_internal(size_t size, const char* file, int line) {
     OWNEDC_LOCK();
@@ -116,16 +174,12 @@ void* owner_malloc_internal(size_t size, const char* file, int line) {
     }
     OWNEDC_UNLOCK();
 
-    void* ptr = global_malloc(size);
-    if (!ptr) return NULL;
+    alloc_meta_t* meta = (alloc_meta_t*)global_malloc(sizeof(alloc_meta_t) + size);
+    if (!meta) return NULL;
 
-    alloc_meta_t* meta = (alloc_meta_t*)global_malloc(sizeof(alloc_meta_t));
-    if (!meta) {
-        global_free(ptr);
-        return NULL;
-    }
+    void* user_ptr = (void*)((char*)meta + sizeof(alloc_meta_t));
 
-    meta->ptr = ptr;
+    meta->magic = OWNEDC_MAGIC;
     meta->size = size;
     meta->state = OWNEDC_STATE_OWNED;
     meta->borrow_count = 0;
@@ -135,14 +189,12 @@ void* owner_malloc_internal(size_t size, const char* file, int line) {
     meta->free_file = NULL;
     meta->free_line = 0;
 
-    OWNEDC_LOCK();
     insert_meta(meta);
-    OWNEDC_UNLOCK();
 
     // Poison memory to help detect uninitialized usage
-    OWNEDC_MEMSET(ptr, 0xAA, size);
+    OWNEDC_MEMSET(user_ptr, 0xAA, size);
 
-    return ptr;
+    return user_ptr;
 }
 
 void* owner_malloc(size_t size) {
@@ -162,41 +214,29 @@ void* owner_realloc_internal(void* ptr, size_t size, const char* file, int line)
         return NULL;
     }
 
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid Realloc (Untracked pointer)", ptr, file, line);
     }
     if (meta->state == OWNEDC_STATE_FREED) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Use-after-free (Realloc on freed pointer)", ptr, file, line);
     }
     if (meta->state != OWNEDC_STATE_SHARED && !OWNEDC_THREAD_EQUAL(meta->owner_thread, OWNEDC_THREAD_SELF())) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Thread Ownership Violation (Realloc)", ptr, file, line);
     }
 
-    void* new_ptr = global_realloc(ptr, size);
-    if (new_ptr && new_ptr != ptr) {
-        // Pointer changed, update registry
-        unsigned int old_idx = hash_ptr(ptr);
-        alloc_meta_t** curr = &registry[old_idx];
-        while (*curr) {
-            if (*curr == meta) {
-                *curr = meta->next;
-                break;
-            }
-            curr = &(*curr)->next;
-        }
-        meta->ptr = new_ptr;
-        meta->size = size;
+    remove_meta(meta);
+
+    alloc_meta_t* new_meta = (alloc_meta_t*)global_realloc(meta, sizeof(alloc_meta_t) + size);
+    if (!new_meta) {
         insert_meta(meta);
-    } else if (new_ptr) {
-        meta->size = size;
+        return NULL;
     }
-    OWNEDC_UNLOCK();
-    return new_ptr;
+
+    new_meta->size = size;
+    insert_meta(new_meta);
+
+    return (void*)((char*)new_meta + sizeof(alloc_meta_t));
 }
 
 void* owner_realloc(void* ptr, size_t size) {
@@ -206,39 +246,50 @@ void* owner_realloc(void* ptr, size_t size) {
 void owner_free_internal(void* ptr, const char* file, int line) {
     if (!ptr) return;
 
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid free (Untracked pointer)", ptr, file, line);
     }
 
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     if (meta->state == OWNEDC_STATE_FREED) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Double-free", ptr, file, line);
     }
 
     if (meta->borrow_count > 0) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Freeing borrowed object", ptr, file, line);
     }
 
     if (meta->state != OWNEDC_STATE_SHARED && !OWNEDC_THREAD_EQUAL(meta->owner_thread, OWNEDC_THREAD_SELF())) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Thread Ownership Violation (Free)", ptr, file, line);
     }
 
     meta->state = OWNEDC_STATE_FREED;
     meta->free_file = file ? file : "<unknown>";
     meta->free_line = line;
-    OWNEDC_UNLOCK();
+    SHARD_UNLOCK(idx);
 
     // Poison memory to help detect use-after-free
     OWNEDC_MEMSET(ptr, 0xEF, meta->size);
 
-    // We don't actually call free(ptr) yet to allow catching use-after-free via poison.
-    // In a real implementation we might quarantine it. For phase 1, we'll free it but keep metadata.
-    global_free(ptr);
+    remove_meta(meta);
+
+    // Quarantine the block to safely detect UAF and double-frees
+#ifndef OWNEDC_NO_STDLIB
+    pthread_mutex_lock(&quarantine_mutex);
+#endif
+    if (quarantine[quarantine_tail]) {
+        global_free(quarantine[quarantine_tail]);
+    }
+    quarantine[quarantine_tail] = meta;
+    quarantine_tail = (quarantine_tail + 1) % QUARANTINE_SIZE;
+#ifndef OWNEDC_NO_STDLIB
+    pthread_mutex_unlock(&quarantine_mutex);
+#endif
 }
 
 void owner_free(void* ptr) {
@@ -250,86 +301,85 @@ void ownership_transfer(void* from, void* to) { (void)from; (void)to; }
 
 void ownership_claim(void* ptr) {
     if (!ptr) return;
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid claim (Untracked pointer)", ptr, NULL, 0);
     }
-    // Update the owner to the current thread
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     meta->owner_thread = OWNEDC_THREAD_SELF();
-    meta->state = OWNEDC_STATE_OWNED; // Reset to purely owned just in case
-    OWNEDC_UNLOCK();
+    meta->state = OWNEDC_STATE_OWNED;
+    SHARD_UNLOCK(idx);
 }
 
 void ownership_borrow(void* ptr) {
     if (!ptr) return;
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid borrow (Untracked pointer)", ptr, NULL, 0);
     }
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     if (meta->state == OWNEDC_STATE_FREED) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Use-after-free (Borrow on freed pointer)", ptr, NULL, 0);
     }
     if (meta->state != OWNEDC_STATE_SHARED && !OWNEDC_THREAD_EQUAL(meta->owner_thread, OWNEDC_THREAD_SELF())) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Thread Ownership Violation (Borrow)", ptr, NULL, 0);
     }
     meta->borrow_count++;
     if (meta->state != OWNEDC_STATE_SHARED) {
         meta->state = OWNEDC_STATE_BORROWED;
     }
-    OWNEDC_UNLOCK();
+    SHARD_UNLOCK(idx);
 }
 
 void ownership_release(void* ptr) {
     if (!ptr) return;
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid release (Untracked pointer)", ptr, NULL, 0);
     }
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     if (meta->borrow_count > 0) {
         meta->borrow_count--;
         if (meta->borrow_count == 0 && meta->state == OWNEDC_STATE_BORROWED) {
             meta->state = OWNEDC_STATE_OWNED;
         }
     } else {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Release without borrow", ptr, NULL, 0);
     }
-    OWNEDC_UNLOCK();
+    SHARD_UNLOCK(idx);
 }
 
 void ownership_share(void* ptr) {
     if (!ptr) return;
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         ownedc_diagnostics_fatal("Invalid share (Untracked pointer)", ptr, NULL, 0);
     }
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     if (!OWNEDC_THREAD_EQUAL(meta->owner_thread, OWNEDC_THREAD_SELF())) {
-        OWNEDC_UNLOCK();
+        SHARD_UNLOCK(idx);
         ownedc_diagnostics_fatal("Thread Ownership Violation (Share must be called by owner)", ptr, NULL, 0);
     }
     meta->state = OWNEDC_STATE_SHARED;
-    OWNEDC_UNLOCK();
+    SHARD_UNLOCK(idx);
 }
 
-/* Diagnostics API Stubs */
+/* Diagnostics API */
 void ownership_inspect(void* ptr) {
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
+    alloc_meta_t* meta = get_meta(ptr);
     if (!meta) {
-        OWNEDC_UNLOCK();
         OWNEDC_PRINTF("Object %p: UNTRACKED\n", ptr);
         return;
     }
+    unsigned int idx = get_shard_idx(ptr);
+    SHARD_LOCK(idx);
     OWNEDC_PRINTF("Object %p:\n", ptr);
     OWNEDC_PRINTF("  Size: %zu\n", meta->size);
     OWNEDC_PRINTF("  State: %d\n", meta->state);
@@ -339,58 +389,74 @@ void ownership_inspect(void* ptr) {
     if (meta->state == OWNEDC_STATE_FREED) {
         OWNEDC_PRINTF("  Freed: %s:%d\n", meta->free_file, meta->free_line);
     }
-    OWNEDC_UNLOCK();
+    SHARD_UNLOCK(idx);
 }
 
 void ownership_dump(void) {
-    OWNEDC_LOCK();
     OWNEDC_PRINTF("--- Ownership Dump ---\n");
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        alloc_meta_t* curr = registry[i];
+    for (int i = 0; i < NUM_SHARDS; i++) {
+        SHARD_LOCK(i);
+        alloc_meta_t* curr = registry_heads[i];
         while (curr) {
-            OWNEDC_PRINTF("Ptr %p, Size %zu, State %d, Borrows %d\n", curr->ptr, curr->size, curr->state, curr->borrow_count);
+            void* user_ptr = (void*)((char*)curr + sizeof(alloc_meta_t));
+            OWNEDC_PRINTF("Ptr %p, Size %zu, State %d, Borrows %d\n", user_ptr, curr->size, curr->state, curr->borrow_count);
             curr = curr->next;
         }
+        SHARD_UNLOCK(i);
     }
-    OWNEDC_UNLOCK();
 }
 
 void ownership_dump_borrows(void) {
-    OWNEDC_LOCK();
     OWNEDC_PRINTF("--- Borrowed Objects Dump ---\n");
     int found = 0;
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        alloc_meta_t* curr = registry[i];
+    for (int i = 0; i < NUM_SHARDS; i++) {
+        SHARD_LOCK(i);
+        alloc_meta_t* curr = registry_heads[i];
         while (curr) {
             if (curr->borrow_count > 0) {
-                OWNEDC_PRINTF("Ptr %p, Size %zu, Borrows %d\n", curr->ptr, curr->size, curr->borrow_count);
+                void* user_ptr = (void*)((char*)curr + sizeof(alloc_meta_t));
+                OWNEDC_PRINTF("Ptr %p, Size %zu, Borrows %d\n", user_ptr, curr->size, curr->borrow_count);
                 found++;
             }
             curr = curr->next;
         }
+        SHARD_UNLOCK(i);
     }
     if (found == 0) {
         OWNEDC_PRINTF("No active borrows.\n");
     }
-    OWNEDC_UNLOCK();
 }
 
 void ownership_stats(void) {
-    OWNEDC_LOCK();
     int active = 0;
     int freed = 0;
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        alloc_meta_t* curr = registry[i];
+    for (int i = 0; i < NUM_SHARDS; i++) {
+        SHARD_LOCK(i);
+        alloc_meta_t* curr = registry_heads[i];
         while (curr) {
-            if (curr->state == OWNEDC_STATE_OWNED || curr->state == OWNEDC_STATE_SHARED || curr->state == OWNEDC_STATE_BORROWED) active++;
-            else if (curr->state == OWNEDC_STATE_FREED) freed++;
+            if (curr->state == OWNEDC_STATE_OWNED || curr->state == OWNEDC_STATE_SHARED || curr->state == OWNEDC_STATE_BORROWED) {
+                active++;
+            } else if (curr->state == OWNEDC_STATE_FREED) {
+                freed++;
+            }
             curr = curr->next;
         }
+        SHARD_UNLOCK(i);
     }
-    OWNEDC_UNLOCK();
+
+#ifndef OWNEDC_NO_STDLIB
+    pthread_mutex_lock(&quarantine_mutex);
+#endif
+    for (int i = 0; i < QUARANTINE_SIZE; i++) {
+        if (quarantine[i]) {
+            freed++;
+        }
+    }
+#ifndef OWNEDC_NO_STDLIB
+    pthread_mutex_unlock(&quarantine_mutex);
+#endif
+
     OWNEDC_PRINTF("OwnedC Stats: %d active allocations, %d freed allocations.\n", active, freed);
-    (void)active;
-    (void)freed;
 }
 
 #ifndef OWNEDC_NO_STDLIB
@@ -401,15 +467,16 @@ void ownership_dump_json(const char* filepath) {
     
     fprintf(f, "{\n  \"allocations\": [\n");
     
-    OWNEDC_LOCK();
     int first = 1;
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        alloc_meta_t* curr = registry[i];
+    for (int i = 0; i < NUM_SHARDS; i++) {
+        SHARD_LOCK(i);
+        alloc_meta_t* curr = registry_heads[i];
         while (curr) {
             if (curr->state != OWNEDC_STATE_FREED) {
                 if (!first) fprintf(f, ",\n");
+                void* user_ptr = (void*)((char*)curr + sizeof(alloc_meta_t));
                 fprintf(f, "    {\n");
-                fprintf(f, "      \"ptr\": \"%p\",\n", curr->ptr);
+                fprintf(f, "      \"ptr\": \"%p\",\n", user_ptr);
                 fprintf(f, "      \"size\": %zu,\n", curr->size);
                 fprintf(f, "      \"state\": \"%d\",\n", curr->state);
                 fprintf(f, "      \"owner_thread\": %lld,\n", (long long)curr->owner_thread);
@@ -419,8 +486,8 @@ void ownership_dump_json(const char* filepath) {
             }
             curr = curr->next;
         }
+        SHARD_UNLOCK(i);
     }
-    OWNEDC_UNLOCK();
     
     fprintf(f, "\n  ]\n}\n");
     fclose(f);
@@ -434,9 +501,6 @@ void ownership_dump_json(const char* filepath) {
 
 size_t owner_malloc_usable_size(void* ptr) {
     if (!ptr) return 0;
-    OWNEDC_LOCK();
-    alloc_meta_t* meta = find_meta(ptr);
-    size_t size = meta ? meta->size : 0;
-    OWNEDC_UNLOCK();
-    return size;
+    alloc_meta_t* meta = get_meta(ptr);
+    return meta ? meta->size : 0;
 }
